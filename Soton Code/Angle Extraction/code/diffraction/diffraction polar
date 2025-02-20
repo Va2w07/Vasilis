@@ -1,0 +1,201 @@
+'''
+Created on 24 Aug 2013
+
+@author: Aaron
+'''
+
+
+import numpy
+import pylab
+from numpy.fft import fft, ifft
+
+xi32=[0.04830766568774, 0.14447196158280, 0.23928736225214, 0.33186860228213, \
+      0.42135127613064, 0.50689990893223, 0.58771575724076, 0.66304426693022, \
+      0.73218211874029, 0.79448379596794, 0.84936761373257, 0.89632115576605, \
+      0.93490607593774, 0.96476225558751, 0.98561151154527, 0.99726386184948]
+wi32=[0.09654008851473, 0.09563872007927, 0.09384439908080, 0.09117387869576, \
+      0.08765209300440, 0.08331192422695, 0.07819389578707, 0.07234579410885, \
+      0.06582222277636, 0.05868409347854, 0.05099805926238, 0.04283589802223, \
+      0.03427386291302, 0.02539206530926, 0.01627439473091, 0.00701861000947]
+
+
+xi=numpy.array(xi32+list(-numpy.array(xi32)))
+wi=numpy.array(wi32+wi32)
+
+
+def J_0(p):    
+    theta=numpy.pi*(1.0 + xi)
+    J_0int=sum(wi*numpy.exp(1.0J*p*numpy.cos(theta)))
+    return J_0int/(2.0*numpy.pi)
+
+def U(rho,rhodash,wavelength,z):
+    p=((2.0*numpy.pi*rhodash*rho)/(wavelength*z))
+    return J_0(p)*rhodash      
+
+def A(rhodash, sigma):    
+    return numpy.exp(-(rhodash/sigma)**2) 
+    
+#sigma=numpy.pi/180
+sigma=20
+
+'positions in mm'
+
+maxpos=10.0
+minpos=0.0
+steps=2000.0
+stepspos=(maxpos-minpos)/steps
+
+'positions in mm'
+imagepos1=10.0
+imagepos2=21.0
+imagesteps=1.0
+dpos= (imagepos2-imagepos1)/imagesteps
+
+'Frequency in THz'
+frequency=1.0
+
+wavelength=3.0e-1/frequency
+print wavelength
+
+def Fraunhofferdiff(z, wavelength, sigma, minpos, maxpos, stepspos):
+    image=numpy.zeros(steps,complex)
+    imageplane=numpy.zeros(steps,complex)
+    objectplane=numpy.zeros(steps,complex)
+    m=0
+
+    for rho in numpy.arange(minpos,maxpos,stepspos):
+        object=0
+        imageplane[m]=rho
+        h=0
+        for rhodash in numpy.arange(minpos,maxpos,stepspos):
+            object+=A(rhodash, sigma)*U(rho, rhodash, wavelength, z)
+            objectplane[h]=A(rhodash,sigma)
+            h+=1
+        image[m]=2.0*numpy.pi*object 
+        m+=1 
+    return image, imageplane, objectplane
+    
+ 
+imageamp=numpy.zeros((steps,imagesteps),complex)
+imageaxis=numpy.zeros((steps,imagesteps),complex)
+objectamp=numpy.zeros((steps,imagesteps),complex)
+posaxis=numpy.zeros(imagesteps,complex)
+
+p=0  
+for i in numpy.arange(imagepos1,imagepos2,dpos):
+    imageamp[:,p], imageaxis[:,p], objectamp[:,p] = Fraunhofferdiff(i, wavelength, sigma, minpos, maxpos, stepspos)
+         
+    posaxis[p]=i
+    pylab.figure()
+    pylab.title('Image'+str(p))
+    pylab.plot(imageaxis[:,p],abs(imageamp[:,p]),label="abs")
+    pylab.plot(imageaxis[:,p],imageamp[:,p].real,label="real")
+    pylab.plot(imageaxis[:,p],imageamp[:,p].imag,label="imag")
+    pylab.ylabel('amplitude')
+    pylab.xlabel('position [mm]') 
+    pylab.legend()
+    
+    pylab.figure()
+    pylab.title('Image'+str(p))
+    pylab.plot(imageaxis[:,p],objectamp[:,p].real,label="aperture")
+    pylab.plot(imageaxis[:,p],numpy.log(fft(objectamp[:,p])),label="fftaperture")
+    
+    p+=1    
+
+import matplotlib.cm as cm
+import matplotlib.mlab as mlab
+import matplotlib.pyplot as plt
+
+Z = imageamp.real
+X = imageaxis[:,0]
+Y = posaxis
+
+X, Y = numpy.meshgrid(X, Y)
+pylab.figure()
+im = plt.imshow(Z, interpolation='bilinear', cmap=cm.RdYlGn,
+                origin='lower', extent=[imagepos1,imagepos2,minpos,maxpos], 
+                aspect='auto', vmax=abs(Z).max(), vmin=-abs(Z).max())
+
+
+
+
+#from mpl_toolkits.mplot3d.axes3d import Axes3D
+
+#fig = plt.figure(figsize=(15,10))
+# surface_plot with color grading and color bar
+#ax = fig.add_subplot(1, 1, 1, projection='3d')
+#p = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+#cb = fig.colorbar(p, shrink=0.5)
+
+    
+
+plt.show()
+    
+1/0    
+imagef=fft(image)
+#objectf=fft(objectplane)
+
+pylab.figure()
+pylab.title('Image')
+pylab.plot(imageplane,image.imag)
+pylab.plot(imageplane,image.real)
+pylab.plot(imageplane,abs(image))
+      
+
+pylab.figure()
+pylab.title('fft of image')
+pylab.plot(imageplane,imagef.imag)
+pylab.plot(imageplane,imagef.real)
+    
+
+pylab.figure()
+pylab.title('fft of object')
+pylab.plot(objectf.imag)
+pylab.plot(objectf.real)
+pylab.show()  
+
+    
+1/0
+
+
+
+
+
+
+
+    
+    
+       
+
+#Z=image[:,0]
+#pylab.figure()
+#pylab.plot(Z)
+#pylab.plot(Z.imag)
+#pylab.show()
+
+
+from matplotlib import cm
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.axes3d import Axes3D
+Z = image.real
+X = imageplanex
+Y = imageplaney
+X, Y = numpy.meshgrid(X, Y)
+
+
+
+fig = plt.figure(figsize=(15,10))
+# surface_plot with color grading and color bar
+ax = fig.add_subplot(1, 1, 1, projection='3d')
+p = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+cb = fig.colorbar(p, shrink=0.5)
+
+#plt.figure()
+#plt.plot(Z[500])
+
+plt.show()
+#pylab.figure()
+#pylab.plot(imageplane,image.real)
+#pylab.plot(imageplane,image.imag)
+#pylab.plot(imageplane,abs(image))
+#pylab.show()

@@ -1,0 +1,189 @@
+'''
+Created on 24 Aug 2013
+
+@author: Aaron
+'''
+
+import cmath
+import pylab
+import numpy
+
+def savedatafile(y, filename, deltaf,M):
+    fileobj=open(filename, 'w')
+    for i in range(0,M):
+        fileobj.write(str(i*deltaf*1e12)+","+str(y[i])+"\n")
+    fileobj.close() 
+
+
+
+def capitalj(n,x):
+    even=True
+    if (x==0.0) and (n==0): return 1.0
+    if (x==0.0) and (n> 0): return 0.0
+    nn=2*floor(.5*(abs(x)+n+20.0))
+    a=0.0; b=1.0E-30; y=0.0; z=1.0
+    i=nn
+    while i>=0:
+        if i==n: z=b
+        c=2.0*i*b/x-a; a=b; b=c;
+        if abs(c)>1.0e10: a*=1.0e-20; b*=1.0e-20; y*=1.0e-20; z*=1.0e-20
+        if even>0: y=y+a
+        even= not even
+        i-=1
+    
+    y=y+y-a
+    return z/y
+
+def gaussint(a, b, delta, f):
+    "Integrates f(x) between a and b with accuracy delta"
+    n=8
+    f1=I(n, a, b, f)
+    f2=-f1
+    while numpy.abs(f2-f1) > delta*numpy.abs(f1):
+        if (n==16384):
+            print "Can't achieve accuracy requested"
+            return 0
+
+        f2=f1
+        n=2*n
+        f1=I(n, a, b, f)
+
+    return f1
+
+#---------------------------------------------------------------------------*/
+
+def I(n, a, b, f):
+    "Divides range a to b into n panels"
+    h=(b-a)/n
+    sum=0.0
+    for i in numpy.arange(0,n):
+        sum+=tenpoint(a+i*h, a+(i+1)*h, f)
+    return sum
+
+def tenpoint(a, b, f):
+    "Evaluates integral from a to b by 10 point Gauss formula"
+    u=0.5*(a+b); v=0.5*(b-a)
+    s=0.2955242247*(f(u+0.1488743389*v)+f(u-0.1488743389*v))+ \
+      0.2692667193*(f(u+0.4333953941*v)+f(u-0.4333953941*v))+ \
+      0.2190863625*(f(u+0.6794095682*v)+f(u-0.6794095682*v))+ \
+      0.1494513491*(f(u+0.8650633666*v)+f(u-0.8650633666*v))+ \
+      0.0666713443*(f(u+0.9739065285*v)+f(u-0.9739065285*v))
+
+    return 0.5*s*(b-a)
+
+#---------------------------------------------------------------------------*/
+
+def fcheck(x):
+    return numpy.exp((0.5J)*zeta*x*x)*capitalj(0,sigma*x)*x
+
+def L(u,v):
+    if u<v:
+        N=2*int(0.5*(20 + numpy.abs(v) + numpy.sqrt(30*numpy.abs(v)).real))
+        even=True
+        sumeven=0.0; sumodd=0.0
+        An=1e-10; Anplus1=0.0; Anplus2=0.0
+        a=(1.0J)*u/v
+        for n in numpy.arange(N, -1, -1):
+            Anminus1=((2*n+2)/v - a)*An + ((2*n+2)*a/v - 1.0)*Anplus1 - a*Anplus2
+            if even: sumeven+=An
+            else:    sumodd+=An
+            even = not even
+            (An, Anplus1, Anplus2) = (Anminus1, An, Anplus1)
+        return Anplus1*numpy.exp((0.5J)*u)/(v*(-a*Anplus1 + Anminus1 + 2.0*(a*sumeven + sumodd)))
+    else:
+        N=2*int(0.5*(20 + numpy.abs(v) + numpy.sqrt(30*numpy.abs(v)).real))
+        even=True
+        sumeven=0.0; sumodd=0.0
+        Bn=1e-10; Bnplus1=0.0; Bnplus2=0.0
+        b=v/((1J)*u)
+        for n in range(N, 0, -1):
+            Bnminus1=(2*n/v + b)*Bn - (2*n*b/v + 1)*Bnplus1 + b*Bnplus2
+            if even: sumeven+=Bn
+            else:    sumodd+=Bn
+            even = not even
+            (Bn, Bnplus1, Bnplus2) = (Bnminus1, Bn, Bnplus1)
+        return ((1J)/u)*numpy.exp((-0.5J)*v*v/u) - \
+               Bnminus1*numpy.exp((0.5J)*u)/((1J*u)*(-Bn-b*Bnplus1 + \
+               2.0*(-sumeven+b*sumodd)))
+
+def A(x):
+    return (L(k*R*R/a, k*R*r*x/a))**2 *numpy.exp((1J)*k*r*r*x*x/a)
+
+def Aref(x):
+    return (L(k*R*R/a, k*R*rref*x/a))**2 *numpy.exp((1J)*k*rref*rref*x*x/a)
+
+R=2.5e-2; r1=2.0e-2; r2=1.45e-2; r3=9.5e-3; a=7.5e-2; r4=5.0e-3; r5=7.5e-3; r6=12.5e-3; rref=2.5e-2
+
+# check function L
+#g1=[]; g2=[]
+#zeta = 5.0
+#for sigma in arange(0.1, 10.0, 0.2):
+#    g1.append(abs(L(zeta, sigma)))
+#    g2.append(abs(gaussint(0.0, 1.0, 1e-6, fcheck)))
+#
+#graph(g1)
+#graph(g2)
+#
+#1/0
+
+g1=[]; g2=[]; g3=[]; g4=[]; g5=[]; g6=[]; faxis=[];
+# freq in THz
+
+deltaf=0.002
+fstart=0.05
+ffinish=0.5
+M=int((ffinish-fstart)/deltaf)
+
+#for f in numpy.arange(fstart, ffinish, deltaf):
+#    faxis.append(f)
+#    k=2*numpy.pi*f*1.0e12/3.0e8
+#    r=r1
+#    g1.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A))/numpy.abs(gaussint(0.0, 1.0, 1e-6, Aref)))
+#    r=r2
+ #   g2.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A))/numpy.abs(gaussint(0.0, 1.0, 1e-6, Aref)))
+#    r=r3
+ #   g3.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A))/numpy.abs(gaussint(0.0, 1.0, 1e-6, Aref)))
+ #   r=r4
+ #   g4.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A))/numpy.abs(gaussint(0.0, 1.0, 1e-6, Aref)))
+ ##   r=r5
+ #   g5.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A))/numpy.abs(gaussint(0.0, 1.0, 1e-6, Aref)))
+ #   r=r6
+ #   g6.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A))/numpy.abs(gaussint(0.0, 1.0, 1e-6, Aref)))
+    
+for f in numpy.arange(fstart, ffinish, deltaf):
+    faxis.append(f)
+    k=2*numpy.pi*f*1.0e12/3.0e8
+    r=r1
+    g1.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A)))
+    r=r2
+    g2.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A)))
+    r=r3
+    g3.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A)))
+    r=r4
+    g4.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A)))
+    r=r5
+    g5.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A)))
+    r=r6
+    g6.append(numpy.abs(gaussint(0.0, 1.0, 1e-6, A)))
+    
+    
+    
+pylab.plot(faxis,g1,label='40 mm')
+pylab.plot(faxis,g2,label='29 mm')
+pylab.plot(faxis,g3,label='19 mm')
+pylab.plot(faxis,g4,label='10 mm')
+pylab.plot(faxis,g5,label='15 mm')
+pylab.plot(faxis,g6,label='25 mm')
+pylab.legend()
+pylab.xlabel('Frequency [THz]')
+pylab.ylabel('Amplitude [a.u.]')
+pylab.show()
+
+savedatafile(g1, 'g140mm.txt', deltaf, M)
+savedatafile(g2, 'g229mm.txt', deltaf, M)
+savedatafile(g3, 'g319mm.txt', deltaf, M)
+savedatafile(g4, 'g410mm.txt', deltaf, M)
+savedatafile(g5, 'g515mm.txt', deltaf, M)
+savedatafile(g6, 'g625mm.txt', deltaf, M)
+
+    

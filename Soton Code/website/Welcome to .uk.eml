@@ -1,0 +1,114 @@
+Delivered-To: vasilis.apostolopoulos@gmail.com
+Received: by 10.70.41.109 with SMTP id e13csp595355pdl;
+        Sat, 10 Jan 2015 03:54:22 -0800 (PST)
+X-Received: by 10.194.92.37 with SMTP id cj5mr41020808wjb.81.1420890861142;
+        Sat, 10 Jan 2015 03:54:21 -0800 (PST)
+Return-Path: <nominet@nominet.org.uk>
+Received: from mx2.nominet.org.uk (mail.nominet.org.uk. [213.248.242.49])
+        by mx.google.com with ESMTP id oo9si24663788wjc.123.2015.01.10.03.54.20
+        for <vasilis.apostolopoulos@gmail.com>;
+        Sat, 10 Jan 2015 03:54:21 -0800 (PST)
+Received-SPF: none (google.com: nominet@nominet.org.uk does not designate permitted sender hosts) client-ip=213.248.242.49;
+Authentication-Results: mx.google.com;
+       spf=none (google.com: nominet@nominet.org.uk does not designate permitted sender hosts) smtp.mail=nominet@nominet.org.uk;
+       dkim=pass header.i=@nominet.org.uk
+DomainKey-Signature: s=main2.dk.nominet.selector; d=nominet.org.uk; c=nofws; q=dns;
+  h=X-IronPort-AV:X-IPAS-Result:Received:Date:From:Reply-To:
+   To:Message-ID:Subject:MIME-Version:Content-Type:
+   Content-Transfer-Encoding;
+  b=xVlUk5r90Hwp4+ECDeZyzagzw0TVG76BCeVv3337nH38oOsoZMN9on+u
+   unwDv6YU5IkykQm40FUVaJ2bW6uWu6lieFLzv3ZMuaTZe8Umi/b+qa2k6
+   iaszAp//WHxFdUz3Yq9Vav1eth4VE1PtojGSIL9Vu+nxr2ww9KNS/54bR
+   v5tF20kzGm5aVPeBcfZkLDRHsGjU/3bXm1Bbl1BOXpsQprQr8FUorc4f3
+   fuJXeDg33pEkhZNGv2Du5GN8I3UqO;
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+  d=nominet.org.uk; i=@nominet.org.uk; q=dns/txt;
+  s=main2.dkim.nominet.selector; t=1420890861;
+  x=1452426861;
+  h=date:from:reply-to:to:message-id:subject:mime-version:
+   content-transfer-encoding;
+  bh=lIXXu7Ksn53S2CcwKLnS2+1kM0uR6Qxap2PP630i9sU=;
+  b=tzDi5ntkMFEj+h6oMeMCbprb9ZUi2cM60DfpA42OW7oGuT7Oca2yunwE
+   EHZr3QAp434fxcY9/aJUBiengovhvv/MKs6StdcsbvBFtMxo/RR2i2oru
+   BnBCxPqGKqJKaLKVeO0Vm8xPILovLVDtPMBfoNVyRZj2z6fUbKZYA04MA
+   8hw7YpOTHudhirBgUeXu8Tflh8I0+8rYXDjluISff9Veubwn+gpZVs70/
+   Lum9ukQlPkAY+r6N9mgRPQHxBnAdv;
+X-IronPort-AV: E=Sophos;i="5.07,736,1413241200"; 
+   d="scan'208";a="15159156"
+X-IPAS-Result: Av//APIRsVTV+OxFgWdsb2JhbABcg1hYgwWvB4UlhEkBiWMNEgqFcYEPQwEBAQEBARABARYmLjcOAYELAzYBgXQBCAEtJlITAg0EAQETAmkJhUcBAYF/AWcJmXCNGYdEiAKCcINjjHAMAR+BIYkshHgOEQ4YCAEDghcMLxGBMAWMXYUfgndMgxIwgkGKO4M6hBA+MQGBBAcXgRcJAQEB
+Received: from ukxremplp02.localnet ([213.248.236.69])
+  by mx2.nominet.org.uk with ESMTP; 10 Jan 2015 11:54:19 +0000
+Date: Sat, 10 Jan 2015 11:54:19 +0000 (GMT)
+From: nominet@nominet.org.uk
+Reply-To: nominet@nominet.org.uk
+To: vasilis.apostolopoulos@gmail.com
+Message-ID: <186939096.1166935.1420890859945.JavaMail.moms@ukxremplp02>
+Subject: Welcome to .uk
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+Dear Vasileios Apostolopoulos
+
+Congratulations!
+
+The following .uk domain names are registered for you:
+
+       thz-tds.co.uk
+
+
+Welcome to .uk
+
+A .uk domain name tells your customers, visitors or supporters that you
+believe in a safe and trusted online experience, whether you are developing a
+business, running a charitable organisation or writing a blog online.
+
+The domain name provider that manages your domain name should be your first
+point of contact for any queries you may have.
+
+Your registrar details are:
+
+Registrar:
+    OVH-FR
+    http://www.ovh.com/
+    020 7357 6616   
+
+
+Domain names registered with this provider:
+       thz-tds.co.uk
+
+
+Nominet is the internet registry for all .uk domain names and operates the
+national infrastructure that helps make the UK internet work.  For more
+information about Nominet please visit our website at www.nominet.org.uk.
+
+You now have access to an online account with Nominet that you can use to
+manage some other services associated with your .uk domain names (for example
+to transfer your domain name or check your registration details).
+
+Please follow the link below to access your online account and confirm that
+your contact details are correct:
+
+https://secure.nominet.org.uk/auth/login.html
+
+For online tips and advice and to discover why .uk is such a great place to
+be, please visit www.agreatplacetobe.co.uk and follow us on twitter @dotuk.
+
+Out on its own for the first time, the new .uk domain is now available to register.
+
+This means that shorter, smarter "example.uk" domain names will be
+available alongside "example.co.uk", "example.org.uk" and so on.
+
+For more information and to check your right to register, please go to
+www.dotuklaunch.co.uk
+
+If you have any queries that we can assist with please contact us.
+
+Customer Services
+T +44 (0)1865 332244
+E nominet@nominet.org.uk
+www.nominet.org.uk
+
+Nominet UK is a company limited by guarantee and registered in England
+under No. 3203859. Our registered office is Minerva House, Edmund Halley Road,
+Oxford Science Park, Oxford, OX4 4DQ, England.

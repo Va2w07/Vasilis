@@ -1,0 +1,13 @@
+ The thz_db folder goes into /usr/share
+You then need to make a symlink to this folder in /var/www
+
+ln -s /usr/share/thz_db /var/www/thz_db
+
+thz.conf is the apache configuration file. It goes into /etc/apache2/sites-available/
+You will need to edit this file for the configuration of the server and site address.
+
+To enable the site you type 
+
+sudo a2ensite thz
+
+you may also need to edit /var/www/thz_db/app.wsgi if your folder structure is diffrent from here.

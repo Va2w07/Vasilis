@@ -1,0 +1,69 @@
+'''
+Created on 24 Aug 2013
+
+@author: Aaron
+'''
+
+import numpy
+import pylab
+
+def propagation(wavelength,L,xdash,x,ydash,y):
+    xdot = (x-xdash)/(numpy.sqrt((x-xdash)**2+(y-ydash)**2+L**2))
+    ydot = (y-ydash)/(numpy.sqrt((x-xdash)**2+(y-ydash)**2+L**2))
+    return numpy.exp(-2.0J*numpy.pi*(xdot*xdash+ydot*ydash)/wavelength)
+
+def propagation2(wavelength,L,xdash,x,ydash,y):
+    d = numpy.sqrt(L**2+(x-xdash)**2+(y-ydash)**2)
+    return numpy.exp(-2.0J*numpy.pi*d/wavelength)
+
+image=numpy.zeros((1000,1000),complex)
+imageplanex=numpy.zeros(1000,int)
+imageplaney=numpy.zeros(1000,int)
+wavelength=1.0
+L=1000.0
+m=0
+for ix in numpy.arange(-500,500):
+    imageplanex[m]=ix
+    m+=1     
+    n=0
+    for iy in numpy.arange(-500,500):
+        imageplaney[n]=iy
+        n+=1     
+        object=0
+        for kxdash in numpy.arange(-50,50):
+            for kydash in numpy.arange(-50,-50):
+                object+=propagation(wavelength,L,kxdash,ix,kydash,iy)
+                image[ix,iy]=object               
+
+#Z=image[:,0]
+#pylab.figure()
+#pylab.plot(Z)
+#pylab.plot(Z.imag)
+#pylab.show()
+
+
+from matplotlib import cm
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.axes3d import Axes3D
+Z = image.real
+X = imageplanex
+Y = imageplaney
+X, Y = numpy.meshgrid(X, Y)
+
+
+
+fig = plt.figure(figsize=(15,10))
+# surface_plot with color grading and color bar
+ax = fig.add_subplot(1, 1, 1, projection='3d')
+p = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+cb = fig.colorbar(p, shrink=0.5)
+
+#plt.figure()
+#plt.plot(Z[500])
+
+plt.show()
+#pylab.figure()
+#pylab.plot(imageplane,image.real)
+#pylab.plot(imageplane,image.imag)
+#pylab.plot(imageplane,abs(image))
+#pylab.show()

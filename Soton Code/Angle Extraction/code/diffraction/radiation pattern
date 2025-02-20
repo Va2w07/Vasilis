@@ -1,0 +1,115 @@
+'''
+Created on 24 Aug 2013
+
+@author: Aaron
+'''
+
+import numpy
+import pylab
+import math
+
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.pyplot as plt
+
+
+def electric_Field(I_0,m,theta,k,R,omega,t):
+    remainder=m%2
+    'odd'
+    if remainder==1:
+        answer = -60*I_0*(numpy.cos(m*numpy.pi*numpy.cos(theta)/2)/(numpy.sin(theta)))*(numpy.exp(1.0J*(k*R-omega*t))/R)
+        if numpy.sin(theta)==0.0 or theta==0.0:
+           # print 'sin(theta)=0', theta, numpy.sin(theta)  
+            return 0.0       
+        if math.isnan(theta)==True:
+            #print 'theta NaN'
+            return 0.0
+        else:
+            #print 'good'
+            return answer
+    'even'        
+    if remainder==0:
+        answer = -60*I_0*(numpy.sin(m*numpy.pi*numpy.cos(theta)/2)/(numpy.sin(theta)))*(numpy.exp(1.0J*(k*R-omega*t))/R)
+       # print theta,numpy.sin(theta)
+    
+        if numpy.sin(theta)==0.0 or theta==0.0:
+           # print 'sin(theta)=0', theta, numpy.sin(theta)  
+            return 0.0       
+        if math.isnan(theta)==True:
+            #print 'theta NaN'
+            return 0.0
+        else:
+            #print 'good'
+            return answer
+    
+wavelength=0.01
+freq=3e8/wavelength
+omega=2*numpy.pi*freq   
+k=2*numpy.pi/wavelength 
+I_0=1.0
+t=2.0
+m=4.0
+
+distanceXstart=0.0
+distanceXstop=1.0
+distanceX=distanceXstop-distanceXstart
+noXsteps=500
+dXaxis=distanceX/noXsteps
+
+
+"Length of the wire"
+distanceYstart=-1.0
+distanceYstop=1.0
+distanceY=distanceYstop-distanceYstart
+noYsteps=500
+dYaxis=distanceY/noYsteps
+
+
+
+image=numpy.zeros((noYsteps,noXsteps),complex)
+imageplanex=numpy.zeros(noXsteps)
+imageplaney=numpy.zeros(noYsteps)
+
+iyy=0
+for iy in numpy.arange(distanceYstart, distanceYstop, dYaxis):
+    imageplaney[iyy]=iy   
+    ixx=0
+    for ix in numpy.arange(distanceXstart, distanceXstop, dXaxis):
+            theta=numpy.tan(float(iy)/ix)
+            R=numpy.sqrt(ix**2+iy**2)
+            image[iyy,ixx]=electric_Field(I_0,m,theta,k,R,omega,t)              
+            imageplanex[ixx]=ix          
+            ixx+=1
+    iyy+=1
+    
+Z = numpy.abs(image)
+X = imageplanex
+Y = imageplaney
+X, Y = numpy.meshgrid(X, Y)
+
+plt.figure()
+im = plt.imshow(Z, interpolation='bilinear', cmap=cm.jet,
+                origin='lower', extent=[distanceXstart,distanceXstop,distanceYstart,distanceYstop], 
+               aspect='auto', vmax=abs(Z).max(), vmin=-abs(Z).max())
+
+
+
+#fig = plt.figure(figsize=(15,10))
+# surface_plot with color grading and color bar
+#ax = fig.gca(projection='3d')
+#p = ax.plot_surface(X, Y, image.real, rstride=1, cstride=1, cmap=cm.jet,
+#                     linewidth=0.0, antialiased=False)
+#cb = fig.colorbar(p, shrink=0.5)
+
+#fig = plt.figure(figsize=(15,10))
+# surface_plot with color grading and color bar
+#ax = fig.gca(projection='3d')
+#p = ax.plot_surface(X, Y, numpy.abs(image), rstride=1, cstride=1, cmap=cm.jet,
+#                     linewidth=0.0, antialiased=False)
+#cb = fig.colorbar(p, shrink=0.5)
+
+
+plt.show()
+
+
