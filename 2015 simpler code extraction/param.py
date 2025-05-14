@@ -43,7 +43,7 @@ def newfixphase(W, kstart, weight, M):
     phase=numpy.zeros(M, float)
         
     phase[kstart] = logW[kstart].imag
-    print kstart, M    
+    print (kstart, M)    
     for k in range(kstart, M-1, 1):
         Z=numpy.conjugate(W[k])*W[k+1]
         phase[k+1] = phase[k] + numpy.arctan2(Z.imag, Z.real)

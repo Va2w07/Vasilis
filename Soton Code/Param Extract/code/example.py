@@ -131,7 +131,7 @@ deltat=0.0194e-12
 #dy=3.0*dy
 # if std dev is not included in data file model the errors
 # a simple model
-print max(abs(y))
+print (max(abs(y)))
 dy=(0.002*ones(L)*max(abs(y)) + 0.002*abs(y))
 # a more sophisicated model
 #dy=20.0*ops.noise_model_time(y)

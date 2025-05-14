@@ -107,9 +107,9 @@ def _testgraph():
 		_graph_number=0
 	else:
 # _c does exist so test if widget exists	
-		try:
-			test=Misc.winfo_exists(_c)
-		except _tkinter.TclError:
+#		try:
+#			test=Misc.winfo_exists(_c)
+#		except _tkinter.TclError:
 # widget has been destroyed so delete _c and start again
 			del(_c)
 			_c=Canvas(width=640, height=480, background="grey60")
@@ -162,13 +162,13 @@ def histogram(y):
 
 #-----------------------------------------------------------------------------
 
-def clear_graph():
-	global _graph_number
-	try: _c.delete("graphical")
-	except _tkinter.TclError: pass
-	except NameError: pass	
-	
-	_graph_number=-1
+#def clear_graph():
+#	global _graph_number
+#	try: _c.delete("graphical")
+#	except _tkinter.TclError: pass
+#	except NameError: pass	
+#	
+#	_graph_number=-1
 
 #-----------------------------------------------------------------------------
 

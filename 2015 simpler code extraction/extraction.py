@@ -48,14 +48,14 @@ def bufferData(xR, yR, xS, yS):
     yS = numpy.insert(yS,0,0)    
     yR = numpy.insert(yR,0,0)    
     
-    yR = numpy.lib.pad(yR,paddingR,'edge')
-    yS = numpy.lib.pad(yS,paddingC,'edge')
+    yR = numpy.pad(yR,paddingR,'edge')
+    yS = numpy.pad(yS,paddingC,'edge')
 
     M = int(numpy.log2(len(yS)))+2
     extra = 2**M - len(yS)
 
-    yS = numpy.lib.pad(yS,(0,extra),'edge')
-    yR = numpy.lib.pad(yR,(0,extra),'edge')
+    yS = numpy.pad(yS,(0,extra),'edge')
+    yR = numpy.pad(yR,(0,extra),'edge')
 
     return yR,yS
 
@@ -116,10 +116,10 @@ def getRefrac(xR, yR, xS, yS, thickness, tUnit,dtt,dt, L):
     (yR, yS) = bufferData(xR,yR,xS,yS)
     
     N = len(yR)
-    M = N/2.0
+    M = round(N/2.0)
 
     N = L
-    M = N/2.0
+    #M = N/2.0 do not understand this assignment
        
     df=1.0/(N*dt)
     dk = 2*numpy.pi*df/2.9979e8
@@ -129,10 +129,10 @@ def getRefrac(xR, yR, xS, yS, thickness, tUnit,dtt,dt, L):
     dw=2*numpy.pi*f*dtt
     xR = time
     xS = time
-    print N
+    print (N)
 
 
-    print f
+    print (f)
 
     YR = fft(yR,L)/L
     YS = fft(yS,L)/L
