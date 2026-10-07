@@ -1,0 +1,6 @@
+
+============================================================
+  AGENT A — Coder (applying review)
+============================================================
+
+I'll start by reading the current script and understanding the data.Now let me establish a baseline by running the current script.Baseline reproduced — matches the reviewer's stated on-disk numbers (0.157 / 2.106 / 7.817). Now let me numerically verify the two physics claims before changing anything.Finding 1 confirmed. Let me examine the frequency structure to pick a defensible estimator.

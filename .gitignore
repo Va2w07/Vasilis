@@ -1,0 +1,18 @@
+# macOS metadata — the cause of the endless phantom changes
+.DS_Store
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Theo's TerahertzProject is its own repository:
+# https://github.com/Loriginale2000/TerahertzProject
+# Tracked there, deliberately not duplicated here.
+Theo Laoumzis/TerahertzProject/

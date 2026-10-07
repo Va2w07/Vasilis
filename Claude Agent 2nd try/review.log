@@ -1,0 +1,87 @@
+
+============================================================
+  AGENT B — Reviewer (review-only run)
+============================================================
+
+I'll start by reading the code and looking at the outputs.Now let me run the script myself to see the actual numbers, and inspect the data.Script runs and broadly reproduces the claims. Now let me probe the numerics and physics quantitatively.Two significant findings already. Let me now check the Si-absorption floor logic and the robustness of the headline numbers.Robust to analysis choices. Now let me test a physics subtlety in the thickness sum rule.Confirmed a real physics bug. Let me verify it properly and check the remaining items.Let me test a clean fix for the delay extraction, and look at the figure.One correction needed on my own diagnosis — let me pin down the real cause of the k=0 clipping.I verified everything by running the code and instrumenting it. The script is genuinely good — the echo-ratio scheme is correctly derived, the Fresnel signs are right, the transfer matrix is correct, and the headline geometry is solid. But I found several real defects, including one physics bug that biases the quoted quartz numbers.
+
+**I cannot say "no further improvements needed."** Findings, in order of importance:
+
+---
+
+## 1. Physics bug: the sum rule mixes a group delay with phase indices
+
+The docstring derives Eq. (7) from `c·dt_main = (n₁−1)d₁ + (n₂−1)d₂`, where those are **phase** indices — consistent with `optical_thickness()`, which returns `n·d = −cφ/(2ω)` (phase index). But line 584 computes:
+
+```python
+dt_main = -np.polyfit(w_ang[slope_band], ph_T[slope_band], 1)[0] / PS
+```
+
+A polyfit *slope* `dφ/dω` is the **group delay**, not the phase delay `−φ/ω`. Measured difference: **16.5 fs**. That looks tiny, but `d_total = nd_si + nd_qz − c·dt_main` is a difference of large numbers (3270 µm − 1897 µm), so it amplifies timing error ~2.4×:
+
+| dt_main from | value | d_total | d_qz | n_qz |
+|---|---|---|---|---|
+| slope (group) — **as shipped** | 6.3259 ps | 1373.7 µm | 988.3 µm | **1.9762** |
+| −φ/ω (phase) — correct | 6.3095 ps | 1378.6 µm | 993.2 µm | **1.9664** |
+
+**Better still:** you already compute `S_main = rfft(h*g_main)`, the main pulse with all echoes gated out. Its phase is free of the Fabry–Pérot fringe phase that contaminates `arg T`. Using `arg(S_main)` makes the frequency-resolved sum rule **4× flatter** (`d_total` = 1377.6 ± 2.8 µm vs 1378.0 ± 10.7 µm), giving **n_qz = 1.9685 ± 0.0053, d_qz = 992.7 µm**. Both move toward literature fused silica (1.950–1.960) and the 1000 µm nominal.
+
+## 2. The Si "upper bound" k is fed into the quartz inversion as if it were measured
+
+Line 642 passes `k_si_fit` into `solve_k_from_transfer_matrix`. Section [6] explicitly says Si absorption "lies BELOW this floor; reported as an upper bound" — i.e. it is artifact, not signal. Yet that artifact absorbs real loss in the quartz fit:
+
+| f | α_qz with k_Si = 0 | α_qz as shipped | bias |
+|---|---|---|---|
+| 0.5 THz | 0.31 | 0.157 | **−49 %** |
+| 1.0 THz | 2.60 | 2.106 | −19 % |
+| 2.0 THz | 8.18 | 7.817 | −4 % |
+
+Set `k_Si = 0` in the quartz inversion and carry ±floor as a systematic band. **Note:** your report's numbers (0.31 / 2.6 / 8.2) are the `k_Si = 0` values — they do **not** match the code on disk, which prints 0.157 / 2.11 / 7.82.
+
+## 3. The α_Si bound contradicts the script's own table
+
+Summary prints `alpha_Si <= 1.18 cm^-1 across the band`, but the table two lines above prints **1.512 at 2.5 THz** (band max: 1.557). Cause: `k_si_off` is removed as a constant in **k** (line 640/645) while `a_si_off` is a median in **α** — different quantities, so the corrected α drifts with ω. It's also **−1.74 cm⁻¹ at 0.3 THz**, hidden by `max(alpha_si[i], 0)`. Quote the bound as `max|α_Si|` over the *reported* band (≈1.6 cm⁻¹) and don't silently clip negatives — negative α is your best evidence of the systematic's size.
+
+## 4. α_qz: 12.4 % of bins are clipped at k = 0, and single-bin reads are biased high
+
+187 of 1514 bins in 0.2–3.0 THz have `|T_meas| > |T_model(k=0)|`, so the bisection pins at its lower bound and prints `k_qz = 2.17e-19` / `alpha = 0.000` — which reads as "zero absorption" rather than "unresolved". Only 5 of those are `|T| > 1`; the rest come from fringe-flank mismatch (fringe positions agree to 0.9 % of a period, so the model is fine — it's the ~1 % residual amplitude). Report fringe-averaged values:
+
+| f | single bin (tabulated) | fringe-averaged ±50 GHz |
+|---|---|---|
+| 0.5 THz | 0.31 | **0.12 ± 0.16** |
+| 1.0 THz | 2.60 | **1.87 ± 0.40** |
+| 2.0 THz | 8.18 | **7.64 ± 0.64** |
+
+Mask the pinned bins as NaN rather than plotting them.
+
+## 5. `f_max_usable` takes the max of a non-contiguous mask
+
+```python
+usable = (f_thz > 0.15) & (dyn_db > 20.0)
+f_max_usable = float(f_thz[usable].max())     # 5.13 THz
+```
+The mask has gaps; the **first** crossing below 20 dB is at **3.65 THz**. The printed "DR > 20 dB out to 5.13 THz" is wrong by 40 %, and it's a latent bug — widen `FIT_BAND_THZ` and noise enters the fit. Use the first crossing.
+
+## 6. Over-precise reporting, no uncertainties
+
+`n_quartz = 1.9762` and `d_quartz = 988.27 µm` are quoted to 5 significant figures. Across defensible analysis choices the spread is ±0.005 (gate width, IRF band, cal band) and ±0.01 for the `dt_main` fit band; the frequency-resolved scatter is ±0.021. Honest quote: **n_qz = 1.97 ± 0.01, d_qz = 990 ± 5 µm.** Worth stating explicitly that only `n·d = 1953.1 µm` is measured — n_qz and d_qz are 100 % anti-correlated, and the whole result is tied to the `N_SI_REF` anchor (Δn_Si = ±0.0075 → Δn_qz = ∓0.0017).
+
+## 7. Plot issues
+
+- **(a)** The cross-echo marker is drawn at 28.14 ps but `set_xlim(-4, 28)` clips it — the code draws a line and label that never appear. Extend to ~32 ps.
+- **(g)** `np.clip(alpha_qz, 1e-3, None)` on a log axis turns the k=0 bins into spikes down to the axis floor (visible as the dense hash below 1 THz). Mask instead.
+- **(g)** The blue shaded band up to 1.2 cm⁻¹ spans the full width, visually implying everything under it is silicon.
+- **(f)** Shared y-range 1.7–3.7 makes both curves flat lines — all the dispersion information is invisible. Use two panels or a twin axis.
+- **(e)** Data and model overlay perfectly at −120 rad full scale; a 0.12 rad residual can't be seen. Plot the residual.
+- Axes labels, units and the frequency range (0.2–3.0 THz) are otherwise correct and well done.
+
+## 8. Minor
+
+- Three `RuntimeWarning: invalid value encountered in multiply` on stderr (lines 636/645/647) from `0 × inf` at the DC bin, where `k ∝ 1/ω`. Wrap in `errstate` or drop bin 0.
+- `find_data_files` classifies anything without "ref" as sample and takes `sam[0]` — a third `.txt` in the folder would be silently picked up.
+- `solve_k_from_transfer_matrix` runs 60 full transfer-matrix evaluations over all 8193 bins when only ~1500 are reported — restrict to `band` for a ~5× speedup.
+
+---
+
+**What holds up:** the n~ = n − ik convention matches `rfft`'s sign; Eqs. (5)–(6) are correctly derived and the r₁₂r₁₀ > 0 / r₂₃r₂₁ < 0 sign handling (`-R_qz` on line 577) is right; the transfer matrix is correct and resums all orders; echo consistency (2τ_Si within 5 fs, τ_Si+τ_qz within 14 fs) is excellent; **d_Si = 385.4 µm vs 385 nominal (+0.10 %)** is a genuinely impressive independent check; and the Hann-window argument in the docstring is correct and well justified. n_Si = 3.4175 and n_qz ≈ 1.97 are both physically sensible.
+[AGENT B — Reviewer (review-only run) done: success]

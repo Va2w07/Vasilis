@@ -1,0 +1,60 @@
+==============================================================================
+THz-TDS ANALYSIS -- Si wafer on quartz window
+==============================================================================
+
+ACQUISITION
+  samples / scan          : 2425
+  sampling interval       : 33.0 fs   (Nyquist 15.2 THz)
+  record length           : 80.0 ps  (raw resolution 12.5 GHz)
+  zero-padded FFT length  : 32768  -> grid 0.92 GHz
+  analysis band           : 0.25 - 2.60 THz
+
+(A) ECHO TIMING  -- most robust quantities here; no model, no calibration
+  main-pulse delay (stack vs air) :    6.304 ps
+  Si     round-trip delay         :    8.762 ps  ->  n*d =  1313.41 um
+  quartz round-trip delay         :   13.016 ps  ->  n*d =  1951.05 um
+  echo polarities (Si +1, quartz -1) vs Fresnel prediction (+1, -1): OK
+  closure, echoes vs bulk delay   :  0.10 % OK
+
+(C) GLOBAL TRANSFER-MATRIX FIT  -- primary source of absolute n, k and d
+  d_Si                    :   384.15 um   (nominal 385, -0.2 %)
+  d_quartz                :   992.37 um   (nominal 1000, -0.8 %)
+  RMS residual in T       : 0.0191   (|T| ~ 0.62)
+  optimiser               : converged (15 evals)
+
+  thickness cross-check -- echo timing divided by the fitted index:
+    d_Si     = n*d / n_Si  =   383.70 um   (-0.12 % vs fit)
+    d_quartz = n*d / n_qz  =   991.26 um   (-0.11 % vs fit)
+
+OPTICAL CONSTANTS, averaged over 0.4 - 1.6 THz
+                            TMM fit     echo phase
+  n_Si                   :    3.4230        3.4176
+  n_quartz               :    1.9683        1.9662
+  k_Si                   :   0.00000
+  k_quartz               :   0.00414
+  alpha_Si     [1/cm]    :      0.00   <-- below the 1.6 cm^-1 detection limit: UPPER BOUND ONLY
+  alpha_quartz [1/cm]    :      2.07   (detection limit 0.62 cm^-1)
+
+  Absorption sensitivity floor = 2 * (RMS residual / |T|) / d. Fitted alpha
+  below it means 'not resolvable', not 'zero'.
+
+DIAGNOSTIC -- echo magnitudes (reported, NOT inverted for n; see docstring)
+  measured |echo/main|, Si     : 0.1193  (sign +1)
+  measured |echo/main|, quartz : 0.0770  (sign -1)
+  Fresnel product from fitted n, Si     : +0.1478
+  Fresnel product from fitted n, quartz : -0.0880
+  (measured magnitudes sit below these because the echo is also attenuated
+   by a double pass through the layer -- that is why they are not inverted.)
+
+CAVEATS
+  * The reference scan carries its own etalon at +1.5 and +3.6 ps (~3 % of
+    peak) from optics in the beam path. It sits inside the main-pulse gate
+    and is the dominant systematic on the extracted absorption.
+  * |echo/main| is non-monotonic in frequency (rises between 0.6 and 1.0 THz),
+    which is unphysical for pure absorption. Until that is understood, treat
+    alpha as indicative; n is unaffected, being phase-derived.
+  * The record is truncated while ~1 % ringing is still present, setting a
+    floor on fringe-fitting accuracy and hence on the thicknesses.
+  * Si absorption is near the limit this dynamic range can resolve; small
+    alpha_Si is an upper bound, not a measurement.
+==============================================================================
