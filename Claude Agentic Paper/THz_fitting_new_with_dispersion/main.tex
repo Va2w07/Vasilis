@@ -1,0 +1,367 @@
+%% Optics Express manuscript -- Optica Publishing Group universal template (optica-article.cls)
+%% Compile with pdfLaTeX + BibTeX.  Files needed alongside this one: optica-article.cls, styles/opticajournal.sty,
+%% opticajnl.bst, jabbrv.sty, jabbrv-ltwa-all.ldf, jabbrv-ltwa-en.ldf (all shipped with the Overleaf template), refs.bib, figs/.
+\documentclass{optica-article}
+\journal{opticajournal}          % use \journal{oe} if your template version ships an Optics Express style file
+\articletype{Research Article}
+\setcopyright{Optica Publishing Group under the terms of the Optica Open Access Publishing Agreement}
+
+\usepackage{amsmath,bm}
+\usepackage{booktabs,multirow}
+\usepackage{siunitx}\sisetup{detect-all,range-phrase=--,range-units=single}
+\usepackage{xcolor}\newcommand{\todo}[1]{\textcolor{red}{#1}}
+\graphicspath{{figs/}}
+\newcommand{\kap}{\kappa}
+\newcommand{\Lt}{\mathcal{L}}
+
+\begin{document}
+
+\title{Terahertz multi-layer material parameter extraction using gradient descent: what the loss landscape says about what can be measured}
+
+\author{Theo Smith,\authormark{1} Arta Latifi,\authormark{2} Nicholas T. Klokkou,\authormark{1} Ben Beddoes,\authormark{1} Jon Gorecki,\authormark{2} Georgios D. Barmparis,\authormark{3} and Vasilis Apostolopoulos\authormark{*,3,1}}
+
+\address{\authormark{1}School of Physics and Astronomy, University of Southampton, Southampton SO17 1BJ, United Kingdom\\
+\authormark{2}Royal School of Mines, Imperial College London, London SW7 2AZ, United Kingdom\\
+\authormark{3}Laser and THz Laboratory, Department of Physics, University of Crete, Heraklion 70013, Greece\\
+\authormark{4}Twenty-One Semiconductors GmbH, Neckartenzlingen, Germany\\
+\authormark{5}Optoelectronics Research Centre, University of Southampton, Southampton SO17 1BJ, United Kingdom\\
+\todo{[author list, affiliations, postcodes and order to be confirmed]}}
+
+\email{\authormark{*}v.apostolopoulos@physics.uoc.gr}
+
+\begin{abstract}
+Terahertz time-domain spectroscopy (THz-TDS) can in principle return the thickness and complex refractive index of every layer of a stratified sample from a single transmission trace, but the associated inverse problem is notoriously unstable once the sample is thin or contains several layers. We present a differentiable transfer-matrix (TMM) forward model fitted to the measured time-domain pulse by gradient descent (Adam), seeded by Bayesian optimisation, and use it to extract $n$, $\kap$ and $d$ simultaneously for every layer. On noise-free simulations the pipeline recovers all fifteen parameters of a five-layer stack to better than \SI{0.04}{\percent} in $n$ and $d$, and for a thin film on a substrate it is exact down to a film round-trip time of about half the pulse width; with \SI{40}{dB} of noise, thickness is recovered to better than \SI{1}{\percent} above that threshold while the extinction coefficient is one to two orders of magnitude less reliable. On an experimental quartz-on-silicon bilayer three independent starts converge to the same optimum, $n_{\mathrm{q}}=1.964$, $d_{\mathrm{q}}=\SI{994}{\micro\metre}$, $n_{\mathrm{Si}}=3.447$, $d_{\mathrm{Si}}=\SI{381}{\micro\metre}$, but only after $2\times10^4$ iterations, and with an unphysical negative $\kap_{\mathrm{Si}}$ that a positivity constraint drives to zero at a cost of \SI{0.25}{\percent} in loss. To explain both observations we analyse the loss landscape directly: the sensitivity matrix $J^\top J$ of the simulated pulse spans more than three orders of magnitude in singular value (condition number $\approx 5\times10^3$), the refractive index and thickness of each layer are anti-correlated at the \num{0.99} level, and the extinction coefficients are two to three orders of magnitude less visible than the refractive indices. Projecting the optimiser trajectory onto the principal planes of its own path shows a two-phase descent: a fast, well-conditioned approach along the optical-path directions followed by a slow drift along a nearly flat $\kap$ valley that consumes \SI{90}{\percent} of the iteration budget. Cram\'er--Rao bounds derived from the measured noise floor predict thickness uncertainties of tens of nanometres, whereas fits with a combined time- and frequency-domain loss, by Adam or by L-BFGS, converge to the same optical thickness $n\,d$ to \SI{0.03}{\percent} but to individual thicknesses that differ by \SI{\pm1.5}{\percent}; the residual is twenty times the noise floor, so the extraction is model-limited rather than noise-limited. Replacing the constant index of each layer by a cubic $n(f)$ and a quadratic $\kap(f)$ in a normalised frequency variable, sixteen parameters in all, reduces the misfit by \SI{34}{\percent}, removes the pulse-shape residual, and yields a quartz index of 1.967 at \SI{1}{THz} with an extinction rising linearly to $1.1\times10^{-2}$ at \SI{2.4}{THz} and an absorption-free silicon layer; the residual that remains carries the Fabry--P\'erot periodicity of the echoes, and the thicknesses move along, but not out of, the optical-thickness valley. The analysis shows what a transmission measurement can and cannot determine, and which part of the misfit a dispersive model removes and which part it cannot.
+\end{abstract}
+
+% =====================================================================================
+\section{Introduction}
+Terahertz time-domain spectroscopy (THz-TDS) measures the time-varying electric field of a picosecond pulse transmitted through a sample and therefore gives access to the complex, frequency-dependent refractive index without Kramers--Kronig analysis \cite{Grischkowsky1990,Duvillaret1996,Dorney2001,Pupeza2007,Naftaly2007,Neu2018}. For a flat, homogeneous, optically thick slab the classical extraction, which inverts the single-slab Fresnel transfer function $H(\tilde n,\omega)=4\tilde n\,(\tilde n+1)^{-2}\exp[-i(\tilde n-1)\omega d/c]$ frequency by frequency with Newton's method \cite{Duvillaret1996,Duvillaret1999,Withayachumnankul2014}, is stable and converges in a few iterations; the precision of the result is then set by the dynamic range and noise of the spectrometer \cite{Jepsen2005,Withayachumnankul2008,Naftaly2009}. For thin samples, or for several layers, it is not: internal reflections overlap, the transfer function admits multiple mathematically valid solutions, and the objective becomes non-convex \cite{Scheller2009,Scheller2014,Zhang2024}. Thickness and refractive index can then no longer be separated without additional information, which is precisely the regime of the industrial thickness-gauging applications, from paint layers to bonded stacks, in which THz-TDS is most in demand \cite{Yasui2005,Krimi2016,Naftaly2019}.
+
+In this work we treat the extraction as an inverse problem \cite{Tarantola2005,Aster2018} with a forward model that is correct for an arbitrary stack: the transfer-matrix method (TMM) \cite{BornWolf1999,Yeh1988}, implemented in an automatic-differentiation framework (PyTorch \cite{Paszke2019,Baydin2018}) so that the gradient of any scalar objective with respect to every material parameter is exact and cheap. This allows Newton's method to be replaced by the gradient-descent optimisers developed for training neural networks, in particular Adam \cite{Kingma2017}, seeded by a Bayesian global search \cite{Mockus1978,Snoek2012,Shahriari2016,Greenall2017,Peretti2019}, and lets thickness $d$, refractive index $n$ and extinction coefficient $\kap$ be fitted simultaneously for every layer. We first establish, on simulated data, that the pipeline recovers all fifteen parameters of a five-layer stack and show where the extraction fails for a thin film on a substrate as a function of noise and pulse width. We then apply it to an experimental quartz-on-silicon bilayer and analyse the loss landscape of that fit directly, using the sensitivity matrix of the forward model and, borrowed from deep learning \cite{Li2018}, projections of the optimiser trajectory onto the planes in which it actually moves. The analysis explains quantitatively why the fit is slow, why the extinction coefficient is unreliable and drifts to an unphysical negative value unless constrained, and why thickness and index are separated only by the weak Fabry--P\'erot echoes; a comparison of time-domain and combined time- and frequency-domain losses then shows that the remaining uncertainty in thickness is set by the frequency-independent model rather than by noise or by the optimiser. Finally we let the model be right, replacing the constant index of each layer by low-order polynomials in frequency, and show which part of the misfit dispersion removes and which part, the one that carries the thickness information, it leaves.
+
+% =====================================================================================
+\section{Forward model: transfer-matrix method}\label{sec:tmm}
+The transfer-matrix method computes the total transmission and reflection of a stratified medium including all multiple reflections, and every operation it involves (complex arithmetic, trigonometric functions, Fourier transforms) is differentiable, so it can be used directly as the forward model of a gradient-based fit. For a pulse propagating from an incident medium of index $n_0$ into layer $j$ of complex refractive index $\tilde n_j = n_j - i\kap_j$ and thickness $d_j$, with complex optical path $D_j=\tilde n_j\,\omega d_j/c$, continuity of the tangential fields at the interfaces gives the single-layer coefficients \cite{BornWolf1999,Yeh1988}
+\begin{align}
+  r_j &= \frac{i}{2}\,\frac{\left(\frac{n_0}{\tilde n_j}-\frac{\tilde n_j}{n_0}\right)\sin(\tilde n_j D_j)}{\cos(\tilde n_j D_j)+\frac{i}{2}\left(\frac{n_0}{\tilde n_j}+\frac{\tilde n_j}{n_0}\right)\sin(\tilde n_j D_j)}, \label{eq:r}\\
+  t_j &= \frac{1}{\cos(\tilde n_j D_j)+\frac{i}{2}\left(\frac{n_0}{\tilde n_j}+\frac{\tilde n_j}{n_0}\right)\sin(\tilde n_j D_j)}, \label{eq:t}
+\end{align}
+which are combined recursively over the layers to give the transmission $T(\omega)$ of the whole stack, including amplitude attenuation, phase delay and every internal reflection. The sample pulse is the reference pulse $x(t)$ filtered by $T$,
+\begin{equation}
+  y(t)=\mathcal{F}^{-1}\!\left[T(\omega)\,\mathcal{F}[x(t)]\right],
+  \label{eq:forward}
+\end{equation}
+evaluated on the positive-frequency half of a zero-padded grid ($4L$ points for a trace of $L$ samples) and completed by conjugate symmetry so that $y(t)$ is real.
+
+% =====================================================================================
+\section{Inverse problem: parametrisation, loss function and optimisers}\label{sec:inverse}
+\subsection{Parameters and loss functions}
+To fit thickness and refractive index simultaneously we assume, until Section~\ref{sec:disp}, a frequency-independent complex index for each layer, so a sample of $N$ layers is described by
+\begin{equation}
+  \theta=\{\theta_1,\dots,\theta_N\},\qquad \theta_j=\{n_j,\kap_j,d_j\},
+\end{equation}
+i.e.\ $3N$ real parameters. In practice we optimise dimensionless multiplicative factors $s_i$ with $p_i = s_i\,p_i^{(0)}$, where $p^{(0)}$ is the initial guess; all parameters then start at $s_i=1$ and a step of $10^{-4}$ means the same fractional change for $n\sim2$, $\kap\sim5\times10^{-3}$ and $d\sim10^{-3}\,\si{\metre}$. This scaling is essential for any first-order optimiser, and it also defines the natural coordinates for loss landscape analysis of Section~\ref{sec:landscape}: throughout we use $x_i=(p_i-p_i^{\mathrm{opt}})/p_i^{(0)}$, the deviation of each parameter from the optimum as a fraction of its nominal value.
+
+The prediction $\hat y(t;\theta)$ is compared with the measured sample pulse $y_{\mathrm{exp}}(t)$ by a scalar loss. For the simulated studies of Section~\ref{sec:sim} we use the root-mean-square error
+\begin{equation}
+  \Lt_{\mathrm{rMSE}}(\theta)=\sqrt{\frac{1}{L}\sum_{i=1}^{L}\left(\hat y(t_i;\theta)-y_{\mathrm{exp}}(t_i)\right)^2},
+  \label{eq:rmse}
+\end{equation}
+and for the experimental fit of Section~\ref{sec:exp} a robust combination of the mean absolute error and the log-cosh error,
+\begin{equation}
+  \Lt_{\mathrm{exp}}(\theta)=\frac{1}{L}\sum_i\left|\hat y_i-y_i\right| + \frac{1}{L}\sum_i \ln\cosh\!\left(\hat y_i-y_i\right),
+  \label{eq:lossexp}
+\end{equation}
+which is less sensitive to the few large residuals near the main pulse that a frequency-independent model cannot remove. Both losses are evaluated in the time domain, which has two consequences that recur throughout the paper: the fit implicitly weights the data by field amplitude, so the main transmitted pulse dominates and the weak echoes contribute little; and because the loss is dominated by an absolute-value term, it is V-shaped (a cone) rather than parabolic around the optimum. Section~\ref{sec:loss} considers frequency-domain alternatives.
+
+\subsection{Gradient descent with Adam}
+Gradient descent updates the parameters against the gradient of the loss,
+\begin{equation}
+  \theta_{t+1}=\theta_t-\eta\,\nabla_\theta\Lt(\theta_t),
+\end{equation}
+with learning rate $\eta$. The gradient is obtained by reverse-mode automatic differentiation \cite{Baydin2018} through the entire forward model of Section~\ref{sec:tmm}, so no analytical derivative is needed and no operation may be non-differentiable; phase unwrapping, for instance, is excluded, which is one reason the fit is formulated in the time domain. To reduce sensitivity to the learning rate and to the very different curvatures of the loss along different parameters we use Adam \cite{Kingma2017}, which maintains exponential moving averages of the gradient and of its square,
+\begin{equation}
+  m_t=\beta_1 m_{t-1}+(1-\beta_1)\nabla_\theta\Lt,\qquad v_t=\beta_2 v_{t-1}+(1-\beta_2)\left(\nabla_\theta\Lt\right)^2,
+\end{equation}
+bias-corrects them, $\hat m_t=m_t/(1-\beta_1^t)$, $\hat v_t=v_t/(1-\beta_2^t)$, and updates
+\begin{equation}
+  \theta_{t+1}=\theta_t-\eta\,\frac{\hat m_t}{\sqrt{\hat v_t}+\epsilon}.
+  \label{eq:adam}
+\end{equation}
+Adam combines momentum with a per-parameter normalisation of the step, which makes it well suited to noisy gradients and poorly scaled landscapes. Two properties of Eq.~(\ref{eq:adam}) matter for interpreting the results below. Every parameter moves at roughly the same normalised rate $\eta$ regardless of how strongly the loss depends on it, so the early path is L-shaped, following first whichever parameter has the largest gradient; and in a direction where the loss is nearly flat Adam does not slow down: it keeps walking at speed $\eta$ along the valley for as long as the gradient keeps the same sign. Where many fits must be run automatically (Section~\ref{sec:limits}) we complement Adam with the limited-memory Broyden--Fletcher--Goldfarb--Shanno quasi-Newton method (L-BFGS) \cite{Liu1989,Nocedal2006}, which uses the same automatic gradients but builds a curvature estimate from their history and converges in far fewer evaluations on this smooth, low-dimensional problem.
+
+\subsection{Bayesian seeding}
+Gradient descent converges only from within the basin of the correct minimum, and the basin of a THz fit is narrow: for a single simulated layer the loss has a trough in $n$ only $\pm0.01$ wide at the correct thickness, and the trough moves to a different $n$ when the assumed thickness is wrong, a first sign of the $n$--$d$ coupling analysed in Section~\ref{sec:landscape}. Initial guesses outside the basin sit in regions of small or misleading gradient. We therefore precede Adam with Bayesian optimisation \cite{Mockus1978,Rasmussen2006,Srinivas2010,Snoek2012,Shahriari2016,Frazier2018}: a Gaussian-process surrogate of the loss is built from a small number of forward evaluations and each new evaluation point is chosen by maximising the expected improvement, which balances exploration and exploitation explicitly. The method is efficient for expensive black-box objectives over wide parameter spaces with few features; its rough solution is then refined by the gradient stage.
+
+% =====================================================================================
+\section{Simulated extractions}\label{sec:sim}
+\subsection{Five layers, fifteen free parameters}
+The synthetic reference pulse used for all simulations is a Gaussian envelope with an exponential tail, chosen to be generic (Fig.~\ref{fig:sim5}, blue). To test the method beyond what conventional routines can handle, a five-layer stack with randomly drawn parameters was simulated (Table~\ref{tab:5layer}, ``true'' columns) and all fifteen parameters were fitted from random initial values within $n\pm0.5$, $\kap\pm0.01$, $d\pm\SI{50}{\micro\metre}$ of the truth, first by Bayesian search over those bounds and then by Adam. Figure~\ref{fig:sim5} shows the pulses at the three stages and Table~\ref{tab:5layer} the results on a noise-free pulse: all refractive indices are recovered to better than \SI{0.04}{\percent} and all thicknesses to better than \SI{0.05}{\percent}, while the extinction coefficients are recovered to between \SI{0.7}{\percent} and \SI{12}{\percent}. The asymmetry between $n,d$ and $\kap$ is not a feature of this particular sample; Section~\ref{sec:landscape} shows that it is a property of the transmission measurement itself.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=0.62\linewidth]{draft_fig5a}\\
+  \includegraphics[width=0.62\linewidth]{draft_fig5b}\\
+  \includegraphics[width=0.62\linewidth]{draft_fig5c}
+  \caption{Five-layer simulated extraction (parameters in Table~\ref{tab:5layer}). Top: synthetic reference pulse, sample pulse and the pulse predicted from the initial guess. Middle: after Bayesian optimisation. Bottom: after Adam refinement; the reconstructed pulse is indistinguishable from the sample pulse.}
+  \label{fig:sim5}
+\end{figure}
+
+\begin{table}[htb]\centering\small
+  \caption{Extraction from a noise-free five-layer simulated pulse (Bayesian seed followed by Adam).}
+  \label{tab:5layer}
+  \begin{tabular}{c ccc ccc ccc}
+    \toprule
+    & \multicolumn{3}{c}{$n$} & \multicolumn{3}{c}{$\kap$} & \multicolumn{3}{c}{$d$ (\si{\milli\metre})}\\
+    \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+    Layer & true & fit & error & true & fit & error & true & fit & error\\
+    \midrule
+    1 & 3.364 & 3.3653 & \SI{+0.038}{\percent} & 0.000356 & 0.000399 & \SI{+12.1}{\percent} & 0.150 & 0.1500 & \SI{-0.03}{\percent}\\
+    2 & 2.522 & 2.5229 & \SI{+0.035}{\percent} & 0.003711 & 0.003618 & \SI{-2.5}{\percent}  & 0.179 & 0.1789 & \SI{-0.03}{\percent}\\
+    3 & 5.411 & 5.4104 & \SI{-0.011}{\percent} & 0.005331 & 0.005254 & \SI{-1.4}{\percent}  & 0.102 & 0.1020 & \SI{0.00}{\percent}\\
+    4 & 4.213 & 4.2115 & \SI{-0.036}{\percent} & 0.008436 & 0.008378 & \SI{-0.69}{\percent} & 0.206 & 0.2061 & \SI{+0.04}{\percent}\\
+    5 & 1.660 & 1.6597 & \SI{-0.019}{\percent} & 0.009043 & 0.008860 & \SI{-2.0}{\percent}  & 0.120 & 0.1200 & \SI{+0.02}{\percent}\\
+    \bottomrule
+  \end{tabular}
+  \par\smallskip\footnotesize \todo{[Thicknesses in the draft table (0.150, 0.179, \dots\ mm) differ from the notebook values (33, 179, 102, 206, \SI{41}{\micro\metre}); confirm which set was actually fitted.]}
+\end{table}
+
+\subsection{Limits: noise and pulse width for a thin film on a substrate}\label{sec:limits}
+To find where extraction fails we vary two experimental parameters, the signal-to-noise ratio and the pulse width, for the most demanding geometry: an optically thin film on a thick substrate (Table~\ref{tab:thinfilm}), with the film thickness scanned from \SIrange{5}{100}{\micro\metre}, i.e.\ from well below to well above the point where the film's internal reflection separates from the main pulse. All six parameters of the stack are free; the errors reported are those of the film. The pulse widths are $\tau=0.5$ and \SI{1.5}{\pico\second} (Fig.~\ref{fig:limits}(a),(b)); the noise is additive white Gaussian noise on the sample trace at a power SNR of \SI{100}{dB} (effectively noise-free: noise r.m.s.\ $10^{-5}$ of the signal r.m.s.) and \SI{40}{dB} (noise r.m.s.\ \SI{1}{\percent} of the signal r.m.s., representative of a fast industrial scan), with three independent noise draws at \SI{40}{dB}. We expect the internal reflections to be what separates $n$ from $d$, in the spirit of echo-based thickness methods \cite{Duvillaret1999,Scheller2009,Yasui2005}, and shorter pulses to resolve thinner films.
+
+For this sweep the pipeline of Section~\ref{sec:inverse} was run in a fully automated form: Bayesian optimisation (60 evaluations, expected improvement) over $n\pm0.5$, $\kap\pm0.01$, $d\pm\SI{50}{\micro\metre}$ about the true values; gradient refinement from the five best distinct Bayesian candidates, keeping the lowest loss; and a final Adam plus quasi-Newton polish. The refinement stage uses L-BFGS with a strong-Wolfe line search \cite{Nocedal2006} rather than Adam alone because it reaches the same optimum in a few hundred function evaluations instead of $10^{3}$--$10^{4}$; the forward model is evaluated in double precision, since in single precision the rMSE floor of $\sim10^{-6}$ is indistinguishable from the \SI{100}{dB} noise floor. Multi-start refinement matters: with a single seed, one fit in five for films below \SI{20}{\micro\metre} ended in the $n\,d$ valley with $n$ high by \SI{150}{\percent} and $d$ low by \SI{88}{\percent}, the optical thickness preserved and the loss an order of magnitude above the floor.
+
+\begin{table}[htb]\centering\small
+  \caption{Parameters of the thin-film-on-substrate test. Pulse widths 0.5 and \SI{1.5}{\pico\second}; SNR 100 and \SI{40}{dB}; \num{4096} points at \SI{19.4}{\femto\second}.}
+  \label{tab:thinfilm}
+  \begin{tabular}{lccc}\toprule
+    Layer & $n$ & $\kap$ & $d$\\\midrule
+    Thin film (fitted, reported) & 3.6 & 0.0203 & \SIrange{5}{100}{\micro\metre}\\
+    Substrate (fitted) & 2.213 & 0.0125 & \SI{496}{\micro\metre}\\\bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=\linewidth]{fig6_limits}
+  \caption{Limits of extraction for a thin film on a substrate. (a),(b) Reference, sample and fitted pulses for a \SI{20}{\micro\metre} film at \SI{40}{dB} with the 0.5 and \SI{1.5}{\pico\second} pulses. (c)--(f) Absolute percentage error of the film's $n$ (blue), $\kap$ (orange) and $d$ (green) versus true film thickness for (c) \SI{100}{dB}, \SI{0.5}{\pico\second}; (d) \SI{100}{dB}, \SI{1.5}{\pico\second}; (e) \SI{40}{dB}, \SI{0.5}{\pico\second}; (f) \SI{40}{dB}, \SI{1.5}{\pico\second}. At \SI{40}{dB} the line is the median and the band the full range over three noise realisations. Errors below $10^{-4}\,\%$ are drawn at the axis floor.}
+  \label{fig:limits}
+\end{figure}
+
+Figure~\ref{fig:limits} summarises the results. On noise-free data (c,d) the recovery is exact, to the $10^{-4}\,\%$ level in $n$ and $d$ and $10^{-3}\,\%$ in $\kap$, for every film of \SI{15}{\micro\metre} and above with the \SI{0.5}{\pico\second} pulse and of \SI{20}{\micro\metre} and above with the \SI{1.5}{\pico\second} pulse. Below those thicknesses the errors jump by three to four orders of magnitude, to \SIrange{1}{5}{\percent} in $n$ and $d$ for the short pulse and \SIrange{5}{70}{\percent} for the long one, and the converged loss stays one to two orders of magnitude above the noise floor: with noise-free data a zero-loss solution exists, so these are failures of the optimiser to find it, not of the data to determine it. Below the threshold the film's internal reflection is no longer a distinct feature and the $n\,d$ valley of Section~\ref{sec:landscape} flattens into a family of near-equivalent solutions among which the global search cannot discriminate. The threshold corresponds to a round-trip time in the film, $2n_{\mathrm f}d/c$, of about \SI{0.36}{\pico\second} for the short pulse and \SIrange{0.5}{0.7}{\pico\second} for the long one, i.e.\ roughly $0.4$--$0.7\,\tau$.
+
+With \SI{40}{dB} of noise (e,f) the same threshold governs, but the errors above it are now set by the noise. For the \SI{0.5}{\pico\second} pulse, $d$ is recovered to better than \SI{1}{\percent} from \SI{15}{\micro\metre} upward and to \SIrange{0.01}{0.1}{\percent} from \SI{30}{\micro\metre}, with $n$ slightly better; $\kap$ is recovered to \SIrange{1}{10}{\percent} over the whole range, one to two orders of magnitude worse than $n$ and $d$ and with a spread between noise draws that is itself tens of percent. For the \SI{1.5}{\pico\second} pulse the usable range starts at about \SI{30}{\micro\metre} ($d$ within \SI{2}{\percent}) and reaches \SI{0.1}{\percent} only above \SI{60}{\micro\metre}; below \SI{20}{\micro\metre} the fit fails, with $d$ errors of \SIrange{60}{80}{\percent} and, in one draw, a solution with $n$ high by \SI{100}{\percent} and $d$ low by \SI{75}{\percent}, again the optical-thickness degeneracy. The extraction therefore degrades gracefully in $n$ and $d$ and erratically in $\kap$; the boundary of reliable thickness extraction is set by the ratio of the film's round-trip time to the pulse width rather than by the fit; and the extinction coefficient is the least reliable output under every condition, a fact Section~\ref{sec:landscape} traces to the sensitivity spectrum of the measurement itself.
+
+% =====================================================================================
+\section{Experimental extraction: quartz on silicon}\label{sec:exp}
+\subsection{Measurement and fit}
+Transmission measurements were made on a quartz plate bonded to a silicon wafer \todo{[bonding method, nominal thicknesses and supplier to be added]} with a Menlo Systems TeraSmart spectrometer (ScanControl v1.14.3) under nitrogen purge, averaging 1000 waveforms over \SI{15}{\minute} for both the reference and the sample scan. The traces contain 2425 points at \SI{33.0}{\femto\second} spacing (\SI{80}{\pico\second} window). The pre-pulse standard deviation of the sample trace is $\sigma=2.4\times10^{-4}$ in the field units of Fig.~\ref{fig:expfit}, against a peak of 2.29, i.e.\ a peak amplitude SNR of about $10^4$.
+
+The two-layer TMM of Section~\ref{sec:tmm}, driven by the measured reference pulse, was fitted with the loss of Eq.~(\ref{eq:lossexp}) and Adam at $\eta=10^{-4}$ on the multiplicative factors, for $2\times10^4$ iterations (\SI{8}{\milli\second} per iteration on two CPU cores), from three initial guesses chosen to bracket the expected quartz index (Table~\ref{tab:exp}, first three rows): the silicon parameters were started at $n_2=3.40$, $\kap_2=0.0054$, $d_2=\SI{400}{\micro\metre}$ in all cases, and the quartz at $n_1=1.982$, 1.900 and 2.010 with $d_1=1000$, 900 and \SI{900}{\micro\metre}. Figure~\ref{fig:expfit} shows the measured pulses, the initial guess, the converged fit and its residual, and Table~\ref{tab:exp} the results.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=\linewidth]{fig_exp_fit}
+  \caption{Experimental quartz/Si extraction. (a) Measured reference and sample pulses with the pulse predicted from the first initial guess. (b) Converged fit (start 1); inset: the internal-reflection echoes. (c) Residual of the fit compared with the measured noise floor $\pm\sigma$: the mean absolute residual is $18\sigma$, concentrated at the main pulse and the first echo, so the fit is limited by the frequency-independent model rather than by noise. (d) Amplitude spectra; the shaded band is used for the spectral loss terms of Section~\ref{sec:loss}. Above \SI{1.5}{THz} the fitted spectrum lies above the measurement, the signature of absorption or scattering that increases with frequency.}
+  \label{fig:expfit}
+\end{figure}
+
+\begin{table}[htb]\centering\small
+  \caption{Quartz/Si extraction from three starting points ($2\times10^4$ Adam iterations each), and from start 1 with $\kap$ constrained to be non-negative (Section~\ref{sec:constrained}). Loss is Eq.~(\ref{eq:lossexp}); the noise-floor MAE would be $2.4\times10^{-4}$. Uncertainties in the last row are the noise-limited Cram\'er--Rao bounds of Section~\ref{sec:cr}.}
+  \label{tab:exp}
+  \begin{tabular}{l cccccc c}\toprule
+    & $n_1$ & $\kap_1$ & $d_1$ (\si{\micro\metre}) & $n_2$ & $\kap_2$ & $d_2$ (\si{\micro\metre}) & loss\\\midrule
+    start 1 & 1.982 & 0.0071 & 1000 & 3.40 & 0.0054 & 400 & $4.66\times10^{-2}$\\
+    start 2 & 1.900 & 0.0071 & 900  & 3.40 & 0.0054 & 400 & $7.39\times10^{-2}$\\
+    start 3 & 2.010 & 0.0071 & 900  & 3.40 & 0.0054 & 400 & $3.04\times10^{-2}$\\\midrule
+    fit 1 & 1.9638 & 0.00541 & 994.3 & 3.4479 & $-0.00144$ & 381.4 & $4.4516\times10^{-3}$\\
+    fit 2 & 1.9636 & 0.00539 & 994.4 & 3.4488 & $-0.00139$ & 381.3 & $4.4517\times10^{-3}$\\
+    fit 3 & 1.9639 & 0.00541 & 994.2 & 3.4473 & $-0.00146$ & 381.4 & $4.4516\times10^{-3}$\\\midrule
+    fit 1, $\kap\ge0$ (ReLU)     & 1.9598 & 0.00482 & 996.4 & 3.4669 & 0.00000 & 379.2 & $4.4629\times10^{-3}$\\
+    fit 1, $\kap\ge0$ (softplus) & 1.9595 & 0.00478 & 996.6 & 3.4680 & 0.00011 & 379.1 & $4.4649\times10^{-3}$\\\midrule
+    noise-limited $1\sigma$ & $5\times10^{-5}$ & $7\times10^{-6}$ & 0.03 & $2\times10^{-4}$ & $1.6\times10^{-5}$ & 0.03 & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Three observations set up the rest of the paper. First, the three starts converge to the same point to four significant figures in $n$ and $d$, so the optimum is unique within the explored region. Second, the fitted silicon extinction coefficient is negative, which is unphysical (Section~\ref{sec:constrained} shows that constraining it drives it to zero, consistent with high-resistivity silicon), and the quartz index of 1.964 is what one expects for fused silica \cite{Grischkowsky1990,Naftaly2007} rather than crystalline quartz \todo{[confirm sample material]}; the silicon index of 3.447 is within \SI{0.3}{\percent} of the literature value for high-resistivity silicon \cite{Dai2004}. Third, the loss falls by a factor of ten in the first $\sim1500$ iterations and by only a further \SI{25}{\percent} in the remaining $18\,500$; the mean absolute residual at the optimum, $4.4\times10^{-3}$, is $18\sigma$ above the noise floor, and Fig.~\ref{fig:expfit}(c) shows it concentrated at the main pulse and the first echo. Fitting is therefore not what limits this measurement. To understand what does, we look at the landscape.
+
+% =====================================================================================
+\section{The loss landscape of the experimental fit}\label{sec:landscape}
+All quantities in this section are computed in the scaled coordinates $x_i=(p_i-p_i^{\mathrm{opt}})/p_i^{(0)}$ introduced in Section~\ref{sec:inverse}, with $p^{\mathrm{opt}}$ the fit-3 optimum of Table~\ref{tab:exp}, so that a displacement of 0.01 means a \SI{1}{\percent} change of any parameter relative to its nominal value.
+
+\subsection{Sensitivity matrix: what the pulse can see}\label{sec:sens}
+A natural first question is the curvature of the loss at the minimum. For the loss of Eq.~(\ref{eq:lossexp}) this is the wrong object: the absolute-value term makes the loss V-shaped, its Hessian is undefined at the optimum, and we found that a finite-difference Hessian even reports zero coupling between $n$ and $d$ because the mixed second difference of a cone vanishes identically along its ridge. The quantity that describes the geometry of the problem independently of the loss is the sensitivity (Gauss--Newton, or Fisher-information) matrix of the forward model \cite{Kay1993,Aster2018},
+\begin{equation}
+  G=\frac{1}{L}J^\top J,\qquad J_{ti}=\frac{\partial \hat y(t_t)}{\partial x_i},
+  \label{eq:G}
+\end{equation}
+computed exactly by automatic differentiation in one backward pass per parameter. Its eigenvectors are the parameter combinations along which the simulated pulse changes most and least, and the square roots of its eigenvalues, $\sigma_k$, are the r.m.s.\ change of the pulse per unit step along them. Figure~\ref{fig:geometry} shows the result at the quartz/Si optimum.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=\linewidth]{fig4_geometry}
+  \caption{Local geometry of the quartz/Si fit. (a) Singular values $\sigma_k$ of the sensitivity matrix $G$ in scaled coordinates; $\sigma_1/\sigma_6\approx5500$. (b) Eigenvector composition, from best to worst constrained. $\sigma_1$ is the common optical path of all layers; $\sigma_3,\sigma_4$ are the anti-phase $n$-versus-$d$ combinations of each layer, broken only by the Fabry--P\'erot echoes; $\sigma_5,\sigma_6$ are the two extinction coefficients. (c) True loss along each eigen-direction: V-shaped in every direction, with echo-order side minima at $\pm\SI{10}{\percent}$ along $\sigma_1$; along $\sigma_5,\sigma_6$ the loss is flat to within a few percent over $\pm\SI{15}{\percent}$ of nominal $\kap$.}
+  \label{fig:geometry}
+\end{figure}
+
+The spectrum spans $\sigma_1/\sigma_6\approx5.5\times10^3$. The best-constrained direction, $\sigma_1=8.7$, is the sum of all four $n$ and $d$ deviations, i.e.\ the total optical path through the stack, which the pulse delay fixes almost perfectly. The next two, $\sigma_2=1.5$ and $\sigma_3=0.69$, redistribute optical path between the two layers and between $n$ and $d$ within a layer. Then comes a gap of an order of magnitude to $\sigma_4=0.073$, the anti-phase combination ($n_2$ up, $d_2$ down) that leaves $n_2d_2$ unchanged: this is the optical-thickness degeneracy, and the only information that lifts it is the amplitude and timing of the internal-reflection echoes, whose Fresnel coefficients depend on $n$ alone. The correlation coefficients of $G$ make the same point directly, $\rho(n_1,d_1)=0.97$ and $\rho(n_2,d_2)=0.99$. Finally, another order of magnitude down, $\sigma_5=0.019$ and $\sigma_6=0.0016$ are the two extinction coefficients, mutually correlated at $\rho(\kap_1,\kap_2)=0.95$ and two to three orders of magnitude less visible than the indices. Per unit fractional change, $\kap_1$ is 250 times and $\kap_2$ 1000 times less visible than $n_1$. The physics is elementary: a \SI{1}{\percent} change of $n$ shifts the phase by $\sim\SI{0.4}{rad}$ per millimetre at \SI{1}{THz}, whereas a \SI{1}{\percent} change of $\kap\approx0.005$ changes the amplitude by \SI{0.1}{\percent}. This is the quantitative form of the erratic $\kap$ recovery in Table~\ref{tab:5layer} and Fig.~\ref{fig:limits}.
+
+\subsection{The optimiser's path: a two-phase descent}\label{sec:pca}
+Section~\ref{sec:sens} described the landscape at a single point, the optimum, through the local sensitivity of the forward model; it says which parameter combinations the data constrain, but nothing about how an optimiser gets there. This section asks the complementary question: along which directions does Adam actually move from each starting point, how does the loss vary along them, and how is the iteration budget spent. Answering it requires a global rather than a local view of the loss, i.e.\ two-dimensional maps of $\Lt$ over regions of parameter space large enough to contain the whole trajectory, and the practical difficulty is choosing which two of the six dimensions to show.
+
+The conventional choice is to slice the loss through pairs of parameters ($n_1$--$d_1$, $n_1$--$\kap_1$, \ldots). Such slices have two drawbacks: the trajectory generally does not lie in the slice (the other four parameters differ at every iteration, so the plotted path points do not have the plotted loss), and with six parameters there are fifteen pairs. Following practice in deep learning \cite{Goodfellow2015,Li2018} we instead let the trajectory choose the plane: the $N\times6$ matrix of iterates, in scaled coordinates, is centred and decomposed by singular value decomposition; the two leading right-singular vectors, the principal components of the path \cite{Jolliffe2002}, span the plane; the loss is evaluated on a grid in that plane and the path is drawn by orthogonal projection onto it. The two axes are then the two directions along which the optimiser actually moved most, and the fraction of the path variance they capture measures how faithful the picture is.
+
+Applied naively to the whole run the method fails informatively: \SI{92}{\percent} of the path variance lies along $\kap_2$, because $\kap_2$ moves by \SI{130}{\percent} of its nominal value while $n$ and $d$ move by a few percent, yet the loss barely depends on that motion. We therefore split the run at the iteration by which every start has completed \SI{95}{\percent} of its total loss decrease (iteration 1615 here), and treat the two phases separately (Fig.~\ref{fig:twophase}). For Phase~I each start gets its own plane, computed in curvature-normalised coordinates (each axis multiplied by $\sqrt{G_{ii}}$, so that a unit step along any axis changes the pulse by the same amount; this is also the metric Adam approximates); within these planes the loss of the projected path reproduces the true loss to \SIrange{10}{20}{\percent}. For Phase~II all three starts share one plane in plain scaled coordinates, which captures \SI{99.7}{\percent} of the path variance.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=\linewidth]{fig1_pca_two_phase}
+  \caption{The descent of the quartz/Si fit projected onto the principal planes of its own path (log colour scale; $+$ marks the global optimum; $\bullet$ start, $\star$ end of the phase, $\circ$ iteration milestones). (a)--(c) Phase~I, iterations 1--1615, one panel per start in curvature-normalised coordinates: each path descends an elongated but well-conditioned bowl whose axes are combinations of $n$ and $d$, following the L-shaped route characteristic of Adam. (d) Phase~II, iterations 1615--20\,000, shared plane: the three starts have merged and creep along a valley whose axis is $0.97\kap_2+0.24\kap_1$, gaining \SI{25}{\percent} in loss over 18\,000 iterations. (e) Loss versus iteration with the phase boundary.}
+  \label{fig:twophase}
+\end{figure}
+
+The picture is now legible. In Phase~I the loss drops by an order of magnitude in about a thousand iterations as each start descends a bowl whose principal axes are the $\sigma_1$--$\sigma_3$ combinations of $n$ and $d$; the L-shaped paths follow from Adam's per-parameter step normalisation, each parameter moving at the same rate until its own gradient changes sign. By the end of Phase~I the three starts, which differed by \SI{6}{\percent} in $n_1$ and \SI{10}{\percent} in $d_1$, agree on all $n$ and $d$ to better than \SI{0.1}{\percent}. In Phase~II they all sit in the same valley, $0.97\kap_2+0.24\kap_1$, and drift along it at Adam's full speed, $\sim0.7\times10^{-4}$ per step in scaled units, for the remaining 18\,000 iterations. The drift takes $\kap_2$ from 0.0054 through zero to $-0.0015$ while the loss falls from $5.6\times10^{-3}$ to $4.45\times10^{-3}$. The two-phase structure is exactly the sensitivity spectrum of Fig.~\ref{fig:geometry} read as a function of time: Adam spends \SI{8}{\percent} of its budget on the four directions it can see and \SI{92}{\percent} on the two it cannot.
+
+Figure~\ref{fig:pairslices} shows the same fit in the classical pair-slice representation, improved by a shared logarithmic colour scale, per-parameter axis ranges and the trajectories drawn as lines. The $n$--$d$ panels show the $n\,d=$ const hyperbola along which the loss valley runs, and the $\kap$ panels show the loss flat over $\pm\SI{150}{\percent}$ of nominal $\kap$, with the paths wandering along the flat direction. The representation is intuitive but, as noted above, the path points are only projections, so Fig.~\ref{fig:twophase} is the quantitative view.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=\linewidth]{fig3_pair_slices}
+  \caption{Axis-aligned slices of the loss through the optimum for all parameter pairs within each layer (shared log colour scale; deviations in percent of nominal; the dotted red curve is $n\,d=$ const). Paths are projections onto each slice. The $\kap$ axes span $\pm\SI{150}{\percent}$ against $\pm\SI{15}{\percent}$ for $n$ and $d$.}
+  \label{fig:pairslices}
+\end{figure}
+
+\subsection{Noise-limited uncertainties}\label{sec:cr}
+The sensitivity matrix also yields the statistical uncertainty of the fit if the model were exact. With the measured noise floor $\sigma$ and the Gauss--Markov estimate $\mathrm{cov}(\hat x)=\sigma^2 (J^\top J)^{-1}$ \cite{Kay1993} we obtain the Cram\'er--Rao bounds in the last row of Table~\ref{tab:exp}: $n$ to $5\times10^{-5}$, $d$ to \SI{30}{\nano\metre}, $\kap_1$ to \SI{0.13}{\percent} and $\kap_2$ to \SI{1}{\percent} of their values. Two conclusions follow. Noise would not let $\kap_2$ go negative; its sign is a model artefact, examined next. And the noise-limited thickness precision of tens of nanometres is three orders of magnitude better than the disagreement between fits with different loss functions reported in Section~\ref{sec:loss}; noise is not the limiting factor anywhere in this problem.
+
+\subsection{Constraining $\kap\ge0$}\label{sec:constrained}
+The negative $\kap_{\mathrm{Si}}$ of Table~\ref{tab:exp} invites the obvious remedy of constraining the extinction coefficients to be non-negative. We did this by reparametrising $\kap_j = g(\theta_j)\,\kap_j^{(0)}$ with either a rectifier, $g(\theta)=\max(\theta,0)$, or a smooth positive map, $g(\theta)=\mathrm{softplus}(\beta\theta)/\mathrm{softplus}(\beta)$ with $\beta=5$, and repeating the fit from start 1 with the same optimiser and iteration budget (Fig.~\ref{fig:constrained}; Table~\ref{tab:exp}, rows ``$\kap\ge0$''). The two constrained fits behave identically to the free fit for the first $10^4$ iterations, because $\kap_{\mathrm{Si}}$ is positive throughout that time; they diverge only when the free fit crosses zero. The rectifier then stops dead at $\kap_{\mathrm{Si}}=0$, as it must: below zero the gradient of $g$ vanishes and the parameter cannot move again, which is why a rectifier is a poor choice for a constraint that the optimiser is actively pushing against. The softplus map keeps a gradient everywhere and approaches the boundary asymptotically, reaching $1.1\times10^{-4}$ after $2\times10^4$ iterations and still decreasing. Both end at the same loss, $4.463\times10^{-3}$, only \SI{0.25}{\percent} above the unconstrained value.
+
+Three things follow. First, the data are consistent with a lossless silicon layer: $\kap_{\mathrm{Si}}\approx0$ is what one expects for high-resistivity float-zone silicon at these frequencies \cite{Dai2004}, and the unconstrained fit had overshot a true value near zero into unphysical territory by $-1.5\times10^{-3}$, ninety times the noise-limited uncertainty, to absorb an amplitude mismatch. Second, the constraint costs almost nothing in loss, which confirms directly that the residual is not being carried by $\kap$: removing the unphysical degree of freedom leaves the misfit essentially unchanged, so the model error lies elsewhere (the frequency dependence of the optical constants, Fig.~\ref{fig:expfit}(d), taken up in Section~\ref{sec:disp}). Third, the constraint moves the other parameters by exactly the amounts the sensitivity analysis of Section~\ref{sec:sens} predicts: $n_{\mathrm{q}}$ falls by \SI{0.2}{\percent} and $d_{\mathrm{q}}$ rises by \SI{0.2}{\percent}, $n_{\mathrm{Si}}$ rises by \SI{0.6}{\percent} and $d_{\mathrm{Si}}$ falls by \SI{0.6}{\percent}, while $n_{\mathrm{q}}d_{\mathrm{q}}$ and $n_{\mathrm{Si}}d_{\mathrm{Si}}$ change by \SI{0.01}{\percent}. The constrained solution is a different point along the same optical-thickness valley, and the quartz extinction coefficient shifts from 0.0054 to 0.0048 to compensate. A positivity constraint is therefore the right default for $\kap$ in production fits, with a smooth map rather than a rectifier, but it should be understood as removing an unphysical escape route for model error rather than as recovering information the data do not contain.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=\linewidth]{fig10_constrained_kappa}
+  \caption{Quartz/Si fit from start 1 with $\kap$ free (blue), constrained by a rectifier (orange) and by a softplus map (green). (a) $\kap_{\mathrm{Si}}$, (b) $\kap_{\mathrm{q}}$ and (c) loss versus iteration. The three runs coincide until the free fit crosses $\kap_{\mathrm{Si}}=0$ near iteration $10^4$; the rectified parameter then freezes at zero, the softplus parameter approaches zero asymptotically, and the loss is essentially unaffected.}
+  \label{fig:constrained}
+\end{figure}
+
+% =====================================================================================
+\section{Combined time- and frequency-domain loss}\label{sec:loss}
+Because $\kap$ enters the transfer function only through amplitude, one might expect a loss on the log-amplitude spectrum to expose it better than a time-domain residual dominated by the main pulse, and a loss on the spectral phase to pin down the optical path. We therefore also fitted the quartz/Si data with a combined loss
+\begin{equation}
+  \Lt=\Lt_{\mathrm{time}}+\lambda_a\,\Lt_{\ln|T|}+\lambda_\varphi\,\Lt_{\varphi},
+  \label{eq:combined}
+\end{equation}
+in which $\Lt_{\mathrm{time}}$ is the mean absolute time-domain residual, $\Lt_{\ln|T|}$ and $\Lt_\varphi$ are the mean absolute residuals of $\ln|T(\omega)|$ and of the spectral phase in the band \SIrange{0.2}{2.5}{THz}, and each term is divided by its own noise floor ($\sigma$ for the time domain, $\sigma\sqrt{L/2}/|Y(\omega)|$ per spectral bin) so that $\lambda_a=\lambda_\varphi=1$ weights the three equally per unit of noise. Since the Fourier transform is unitary, a properly weighted spectrum carries the same information as the time trace, and the Cram\'er--Rao bounds confirm it: $d_1$ is bounded at \SI{0.003}{\percent} from the time domain and at \SI{0.003}{\percent} from amplitude and phase together, and $\rho(n,d)=-0.99$ under every choice. The combination can therefore only change the result through how it weights the model error. The fits were run from start 1 with Adam and with the limited-memory Broyden--Fletcher--Goldfarb--Shanno method (L-BFGS, Section~\ref{sec:inverse}); L-BFGS reached the loss level of $2\times10^4$ Adam iterations in about 300 function evaluations.
+
+Table~\ref{tab:nd} gives the outcome. The four fits converge to essentially the same solution: the same loss to within \SI{1}{\percent}, and optical thicknesses $n_1d_1$ and $n_2d_2$ that agree to \SI{0.03}{\percent}. The individual thicknesses, however, differ by up to \SI{\pm1.5}{\percent} ($d_1$ between 984 and \SI{1000}{\micro\metre}, $d_2$ between 376 and \SI{392}{\micro\metre}), with $n$ compensating in each case. Beside a noise-limited bound of \SI{30}{\nano\metre}, a \SI{15}{\micro\metre} spread between equally legitimate fits is the clearest statement that the extraction is model-limited: the only feature of the data that separates $n$ from $d$ is the set of echoes, the residual of Fig.~\ref{fig:expfit}(c) shows the frequency-independent model to be wrong precisely there, and where along the $n\,d$ valley a given fit lands is decided by how that fit weights a mismatch the model cannot remove. The frequency-domain terms add no information and do not move the answer in any systematic direction; their value is diagnostic, in that they let the amplitude and phase residuals be inspected separately.
+
+\begin{table}[htb]\centering\small
+  \caption{Thickness and optical thickness from four fits of the quartz/Si data from start 1, differing only in loss function and optimiser. The fits disagree on $d$ at the \SI{\pm1.5}{\percent} level and agree on $n\,d$ to \SI{0.03}{\percent}.}
+  \label{tab:nd}
+  \begin{tabular}{l cc cc}\toprule
+    Fit & $d_1$ (\si{\micro\metre}) & $d_2$ (\si{\micro\metre}) & $n_1d_1$ (\si{\milli\metre}) & $n_2d_2$ (\si{\milli\metre})\\\midrule
+    time only, Adam ($2\times10^4$ it.) & 994.3 & 381.4 & 1.9526 & 1.3150\\
+    time + $\ln|T|$ + phase, Adam (6000 it.) & 983.7 & 392.2 & 1.9533 & 1.3150\\
+    time only, L-BFGS (320 evaluations) & 1000.0 & 375.7 & 1.9528 & 1.3146\\
+    time + $\ln|T|$ + phase, L-BFGS (341 evaluations) & 988.2 & 387.6 & 1.9532 & 1.3150\\\midrule
+    noise-limited $1\sigma$ (time only) & 0.03 & 0.03 & & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% =====================================================================================
+\section{Letting the model be right: low-order dispersion per layer}\label{sec:disp}
+Every diagnostic so far points the same way: the residual of the frequency-independent fit is $18\sigma$ and concentrated at the main pulse (Fig.~\ref{fig:expfit}(c)), the fitted spectrum overshoots the measurement above \SI{1.5}{THz} (Fig.~\ref{fig:expfit}(d)), removing the unphysical $\kap_{\mathrm{Si}}$ costs nothing (Section~\ref{sec:constrained}), and the frequency-domain loss terms add no information (Section~\ref{sec:loss}). The missing element is the frequency dependence of the optical constants. This section adds it in the simplest form compatible with the landscape analysis, a low-order polynomial per layer, and asks what changes and what does not.
+
+\subsection{Polynomial parametrisation and two-stage protocol}
+Rather than treating $\tilde n_j$ at every frequency as an unknown, which would give $2(M+1)$ parameters per layer and a rank-deficient problem, we expand the optical constants of each layer in a normalised, band-limited frequency variable,
+\begin{equation}
+  x(f)=\frac{\operatorname{clip}(f,\,f_{\mathrm{lo}},\,f_{\mathrm{hi}})-f_{\mathrm{ref}}}{f_{\mathrm{scale}}},
+  \label{eq:xnorm}
+\end{equation}
+with $f_{\mathrm{ref}}=f_{\mathrm{scale}}=\SI{1}{THz}$ and $[f_{\mathrm{lo}},f_{\mathrm{hi}}]=[0.2,3.0]\,\si{THz}$, the band over which the sample spectrum stays above the noise floor (Fig.~\ref{fig:expfit}(d)). The refractive index of layer $j$ is a cubic and the extinction coefficient a quadratic,
+\begin{equation}
+  n_j(f)=c_{0j}+a_j x+b_j x^2+c_j x^3,\qquad
+  \kap_j(f)=c^{\kap}_{0j}+a^{\kap}_j x+b^{\kap}_j x^2,
+  \label{eq:poly}
+\end{equation}
+with independent coefficient sets. The normalisation makes $c_{0j}$ the index at \SI{1}{THz} and puts all coefficients on comparable scales, which matters for a first-order optimiser; the clipping freezes the polynomials at their band-edge values outside the region where the data carry information, so that a cubic can never extrapolate to absurd values at the high-frequency edge of the numerical grid and destabilise Eqs.~(\ref{eq:r})--(\ref{eq:t}). The bilayer is then described by sixteen parameters, $\{c_{0j},a_j,b_j,c_j,c^\kap_{0j},a^\kap_j,b^\kap_j,d_j\}_{j=1,2}$, against six before. Each coefficient is written as $\theta=\theta^{\mathrm{init}}+s_\theta\vartheta$ with a trainable dimensionless $\vartheta$ initialised at zero and a fixed scale $s_\theta$ ($s=\theta^{\mathrm{init}}$ for $c_0$ and $d$, $s=0.1$ for the dispersion terms of $n$ and $s=5\times10^{-3}$ for those of $\kap$), the polynomial counterpart of the multiplicative factors of Section~\ref{sec:inverse}, and a binary mask on each $\vartheta$ allows coefficients to be frozen without changing the optimiser. Positivity of $\kap$ is enforced by a soft hinge penalty, $\lambda_\kap\langle\max(0,-\kap_j(f))\rangle_{f,j}$ with $\lambda_\kap=1$, added to the loss of Eq.~(\ref{eq:lossexp}); it is exactly zero for an admissible solution, so it plays the role of the smooth constraint of Section~\ref{sec:constrained} without a reparametrisation.
+
+The fit proceeds in two stages with Adam at $\eta=10^{-4}$. In stage~1 all dispersion terms are masked and only $c_{0j}$, $c^\kap_{0j}$ and $d_j$ are free: this is the six-parameter frequency-independent problem of Section~\ref{sec:exp}, run for \num{15000} iterations from start~1. In stage~2 the dispersion terms are unmasked, the optimiser state is reset and the fit continues for \num{30000} iterations. The two-stage protocol makes the flat solution available as the baseline against which the dispersion terms are judged.
+
+\subsection{Residuals in time and frequency}
+Stage~1 reproduces the constrained fit of Table~\ref{tab:exp} to four significant figures ($n_1=1.9598$, $\kap_1=0.0048$, $d_1=\SI{996.4}{\micro\metre}$, $n_2=3.467$, $\kap_2=0$, $d_2=\SI{379.2}{\micro\metre}$, $\Lt=4.463\times10^{-3}$), as it should, since the hinge penalty and the rectifier both hold $\kap_{\mathrm{Si}}$ at zero. Its residual (Fig.~\ref{fig:disppulses}(a)) is the one already seen in Fig.~\ref{fig:expfit}(c): an antisymmetric feature of amplitude $\pm0.12$ at the main pulse, the signature of an error in pulse shape that no frequency-independent index can correct, with smaller copies at each echo. Unmasking the dispersion terms lowers the loss monotonically to $\Lt=2.896\times10^{-3}$ within \num{15000} further iterations, after which it is stationary to four digits. The mean absolute error falls from $4.39\times10^{-3}$ to $2.88\times10^{-3}$, a reduction of \SI{34}{\percent}, and the peak residual at the main pulse from $0.12$ to $0.035$ (Fig.~\ref{fig:disppulses}(b); note the different residual scales). The penalty term ends at $6\times10^{-7}$, four orders of magnitude below the data misfit, and $\kap_1$ is negative only below \SI{0.24}{THz}, over \SI{1.2}{\percent} of the band, with a minimum of $-2\times10^{-4}$; the constraint is essentially inactive, which is the intended behaviour.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=0.72\linewidth]{fig12a_disp_pulses_flat}\\[2pt]
+  \includegraphics[width=0.72\linewidth]{fig12b_disp_pulses_poly}
+  \caption{Time-domain residuals of the quartz/Si fit. Measured sample pulse (orange) and simulated pulse (dashed black) with the residual below, (a) after stage~1 (frequency-independent $n$, $\kap$; MAE $4.39\times10^{-3}$) and (b) after stage~2 (cubic $n(f)$, quadratic $\kap(f)$; MAE $2.88\times10^{-3}$). Note the different residual scales: the antisymmetric $\pm0.12$ feature at the main pulse in (a), which a constant $\tilde n$ cannot remove, drops to $\pm0.035$ in (b), and the remaining residual is spread over the main pulse and the echoes. All Fabry--P\'erot echoes within the \SI{80}{\pico\second} window are part of the model in both cases.}
+  \label{fig:disppulses}
+\end{figure}
+
+The frequency domain shows where the improvement comes from (Fig.~\ref{fig:dispresidual}). The residual of the flat model is essentially flat in frequency across the whole band, i.e.\ the constant $\tilde n$ mis-fits the pulse shape at all frequencies at once. The residual of the dispersive model lies a factor 3--10 below it between 0.5 and \SI{2.5}{THz} and \SIrange{30}{40}{dB} below the sample spectrum, so the gain is broadband rather than a correction at one end of the band. Above \SI{3}{THz} both residuals merge with the sample spectrum itself, confirming that no information is available there and justifying the band clip of Eq.~(\ref{eq:xnorm}). What the dispersive model leaves behind is instructive: the in-band residual carries the same Fabry--P\'erot periodicity as the sample spectrum, so the model now reproduces the echo timing well but the echo amplitudes imperfectly. The residual is still $12\sigma$ above the noise floor (against $18\sigma$ before), and the extraction remains model-limited, but the model error has moved from the pulse shape, which dispersion fixes, to the echo amplitudes, which it does not.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=0.9\linewidth]{fig13_disp_spectral_residual}
+  \caption{Frequency-domain residuals. Amplitude spectrum of the residual $y-\hat y$ for the flat (blue) and dispersive (orange) models compared with the sample spectrum (grey); the shaded region is the fit band $[0.2,3.0]$\,THz. The flat residual is nearly frequency-independent; the dispersive model reduces it by a factor 3--10 across the band, and the residual that remains retains the Fabry--P\'erot periodicity of the sample spectrum. \todo{[regenerate with the $x$-axis label fully inside the frame]}}
+  \label{fig:dispresidual}
+\end{figure}
+
+\subsection{Extracted dispersion and what the degeneracy still hides}
+The extracted optical constants are shown in Fig.~\ref{fig:dispnk} and the coefficients in Table~\ref{tab:disp}. For the quartz layer, $n_1(f)$ rises from 1.958 at \SI{0.2}{THz} to 1.967 at \SI{1}{THz}, is flat to within $\pm5\times10^{-4}$ between 1 and \SI{2}{THz}, and increases to 1.976 at \SI{3}{THz}; the total variation across the band is \SI{0.9}{\percent}. The extinction coefficient of quartz is, to a very good approximation, linear in frequency, $\kap_1\approx5.4\times10^{-3}\,f[\mathrm{THz}]-1.1\times10^{-3}$, from $\approx0$ at \SI{0.2}{THz} to $1.4\times10^{-2}$ at \SI{3}{THz}; in terms of the power absorption coefficient $\alpha=4\pi f\kap/c$ this is $\alpha\approx\SI{1.8}{cm^{-1}}$ at \SI{1}{THz} and $\approx\SI{14.5}{cm^{-1}}$ at \SI{2.7}{THz}, an almost quadratic dependence. The linear term $a^\kap_1$ is the only dispersion coefficient that changes the loss appreciably: it is the frequency-dependent absorption that the flat fit could only average, and it is exactly the high-frequency excess of Fig.~\ref{fig:expfit}(d). The fitted index of 1.96--1.97 and the smooth quadratic absorption are characteristic of amorphous fused silica rather than crystalline quartz, whose ordinary index at THz frequencies is $\approx2.1$ with much lower loss \cite{Grischkowsky1990,Naftaly2007} \todo{[confirm sample material]}. For the silicon layer, $n_2(f)$ is 3.431 at \SI{0.2}{THz}, 3.435 at \SI{1}{THz} and rises to 3.458 at \SI{3}{THz}, and $\kap_2$ is driven to $<2\times10^{-6}$ over the whole band, i.e.\ $\alpha<\SI{0.005}{cm^{-1}}$, below what the measurement can resolve for a \SI{0.38}{\milli\metre} layer and consistent with high-resistivity float-zone silicon \cite{Dai2004}.
+
+\begin{figure}[htb]\centering
+  \includegraphics[width=0.9\linewidth]{fig11_disp_nk}
+  \caption{Extracted $n(f)$ (top) and $\kap(f)$ (bottom) for the quartz layer (left) and the silicon layer (right) from the frequency-independent stage~1 fit (blue) and the polynomial stage~2 fit (orange). The shaded region is the fit band; outside it the polynomials are frozen at their band-edge values, Eq.~(\ref{eq:xnorm}). The thin black line in the lower-left panel marks $\kap=0$; the quartz extinction crosses zero only below \SI{0.24}{THz}. The silicon extinction (lower right, note the $10^{-6}$ scale) is zero within the resolution of the measurement.}
+  \label{fig:dispnk}
+\end{figure}
+
+\begin{table}[htb]\centering\small
+  \caption{Fitted parameters of the quartz/Si bilayer with the polynomial model, Eq.~(\ref{eq:poly}), in $x=f[\mathrm{THz}]-1$ clipped to $[0.2,3.0]$\,THz. Stage~1 is the frequency-independent baseline (identical to the constrained fit of Table~\ref{tab:exp}); stage~2 frees the dispersion terms. The last rows give the optical thickness at \SI{1}{THz} for comparison with Table~\ref{tab:nd}.}
+  \label{tab:disp}
+  \begin{tabular}{l l r r}\toprule
+    Layer & Parameter & stage 1 (flat) & stage 2 (dispersive)\\\midrule
+    quartz & $c_0$ ($n$ at \SI{1}{THz}) & 1.9598 & 1.9667\\
+           & $a$, $b$, $c$ & 0 & $+0.0033$, $-0.0067$, $+0.0037$\\
+           & $c_0^\kap$ ($\kap$ at \SI{1}{THz}) & 0.00482 & 0.00432\\
+           & $a^\kap$, $b^\kap$ & 0 & $+0.00544$, $-0.00027$\\
+           & $d_1$ (\si{\micro\metre}) & 996.4 & 994.0\\\midrule
+    Si     & $c_0$ ($n$ at \SI{1}{THz}) & 3.4668 & 3.4350\\
+           & $a$, $b$, $c$ & 0 & $+0.0017$, $-0.0017$, $+0.0033$\\
+           & $c_0^\kap$, $a^\kap$, $b^\kap$ & 0 & 0\\
+           & $d_2$ (\si{\micro\metre}) & 379.2 & 382.7\\\midrule
+           & loss $\Lt$ & $4.463\times10^{-3}$ & $2.896\times10^{-3}$\\
+           & MAE & $4.389\times10^{-3}$ & $2.879\times10^{-3}$\\
+           & MAE$/\sigma$ & 18 & 12\\\midrule
+           & $n_1d_1$ at \SI{1}{THz} (\si{\milli\metre}) & 1.9528 & 1.9548\\
+           & $n_2d_2$ at \SI{1}{THz} (\si{\milli\metre}) & 1.3148 & 1.3146\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The dispersive fit also answers the question left open by Table~\ref{tab:nd}. Freeing the dispersion moves the thicknesses from 996.4 to \SI{994.0}{\micro\metre} and from 379.2 to \SI{382.7}{\micro\metre}, by $-0.2$ and \SI{+0.9}{\percent}, while $n_2$ falls from 3.467 to 3.435 and $n_1$ rises from 1.960 to 1.967; the optical thicknesses at \SI{1}{THz}, \SI{1.955}{\milli\metre} and \SI{1.315}{\milli\metre}, are those of every fit in Table~\ref{tab:nd} to \SI{0.1}{\percent}. The new solution is, in other words, another point along the same $n\,d$ valley of Section~\ref{sec:sens}, and the valley itself is not shortened: the literature index of high-resistivity silicon, $3.4175\pm0.0005$ and frequency-independent to $10^{-4}$ over this band \cite{Dai2004}, is \SI{0.5}{\percent} below our $c_{02}$, and adopting it with the fitted optical thickness would imply $d_2=\SI{384.7}{\micro\metre}$, \SI{2}{\micro\metre} from the fitted value; the \SI{0.8}{\percent} rise of $n_2(f)$ towards \SI{3}{THz}, which is not expected physically, is the same degeneracy acting on the frequency-dependent terms, a slightly wrong $d_2$ compensated by a frequency-dependent index that keeps the echo timing right. This is consistent with the residual analysis above. Dispersion removes the pulse-shape error, which was the largest part of the misfit but carried no information about the $n$--$d$ split; the split is carried by the echo amplitudes, and those are what the residual still gets wrong. A dispersive model is therefore necessary to bring the fit to a physically interpretable $\kap(f)$ and a halved misfit, but the thickness of a layer whose index is not known independently is still determined only to the \SI{0.5}{\percent} level, exactly as the sensitivity spectrum of Fig.~\ref{fig:geometry} predicts, and one independent thickness or one literature index per layer remains the way to resolve it.
+
+% =====================================================================================
+\section{Discussion}\label{sec:discussion}
+The simulated and experimental results tell one story from two sides. The simulations show that a differentiable TMM fitted by Bayesian-seeded Adam recovers fifteen parameters of a five-layer stack from a clean pulse, that $n$ and $d$ degrade gracefully with noise and pulse width while $\kap$ does not, and that the thin-film limit is set by the ratio of the film's round-trip time to the pulse duration, at roughly half a pulse width. The experiment on a real bilayer shows that the same pipeline converges reproducibly, but slowly and to a partly unphysical answer, with a residual twenty times the noise. The landscape analysis connects the two: every one of these behaviours is a consequence of the sensitivity spectrum of the transmission measurement, in which the total optical path is constrained thousands of times better than the extinction coefficients and the per-layer $n$--$d$ split is constrained only by the echoes.
+
+Several implications follow for how such fits should be run and reported. The very different sensitivities mean that first-order optimisers spend most of their effort on directions the data barely constrain; either the parameters should be rescaled by $\sqrt{G_{ii}}$ before optimisation, which is what Fig.~\ref{fig:twophase} shows makes the early descent well-conditioned, or a quasi-Newton or Gauss--Newton method should be used, for which the whole problem is a few hundred function evaluations. Uncertainties should be reported from $(J^\top J)^{-1}$ \cite{Kay1993,Aster2018} rather than from the scatter of a few starts, in the same spirit as the error-propagation analyses of single-slab THz-TDS \cite{Withayachumnankul2008}, but only alongside the ratio of residual to noise floor: when that ratio is far above unity, as here, the statistical bound is not the accuracy, and the honest uncertainty on $d$ is the spread between fits with different reasonable losses. A negative $\kap$ or a $\kap$ that drifts for thousands of iterations should be read as a symptom of model mismatch rather than as a value; constraining $\kap\ge0$ with a smooth map removes the unphysical outcome at negligible cost in loss, and the fact that it does so is itself the evidence that the misfit is carried elsewhere. For thickness measurement in particular, the degeneracy means that $d$ cannot be obtained to better than about \SI{1}{\percent} from a simultaneous fit of $n$ and $d$ on a sample like this one, whereas with $n$ known from an independent calibration the noise-limited uncertainty of $d$ from the time-domain trace alone falls to a few nanometres and the accuracy becomes that of $n$.
+
+Section~\ref{sec:disp} is the direct test of the model-error interpretation. Letting each layer have a cubic $n(f)$ and a quadratic $\kap(f)$ halves the misfit, removes the pulse-shape residual that dominated Fig.~\ref{fig:expfit}(c), and turns the averaged $\kap_{\mathrm{q}}$ of the flat fit into a linearly rising extinction with $\alpha\approx\SI{1.8}{cm^{-1}}$ at \SI{1}{THz}, while the silicon stays lossless. It does not, however, shorten the $n\,d$ valley: the dispersive solution sits at another point along it, with $n_{\mathrm{Si}}$ still \SI{0.5}{\percent} above the literature value and $d_{\mathrm{Si}}$ correspondingly low, and the residual that remains has the Fabry--P\'erot periodicity of the echoes, whose amplitudes are the only carrier of the $n$--$d$ split. The two halves of the residual are thus separable: dispersion accounts for the part that carried no thickness information, and what is left, at $12\sigma$, is where the thickness information lives. Candidate causes are a slight wedge or non-parallelism of the plates, a beam that is not perfectly collimated (so that the plane-wave Fresnel coefficients are inexact), an air gap between the two layers, which would be a one-line change to the layer list, and drift between the reference and sample acquisitions; all are systematic and each could be included in the forward model at the cost of one or two parameters, with the residual spectrum of Fig.~\ref{fig:dispresidual} as the test. Independent polynomials for $n$ and $\kap$ do not enforce Kramers--Kronig consistency; for quartz and silicon over this band the violation is negligible, since the index varies by less than \SI{1}{\percent}, but for a material with a resonance in the band a Lorentz or Debye term, causal by construction, is the right basis and changes only the map from coefficients to $\tilde n_j(f)$. A second sample of independently measured thickness would test the accuracy of the extracted $d$ directly. \todo{[state whether a mechanically measured thickness will be included]}
+
+The method of analysis is not specific to THz-TDS or to this model. Any differentiable forward model fitted by gradient descent \cite{Baydin2018} can be interrogated in the same way, with the sensitivity matrix and the principal planes of the trajectory in a curvature-normalised metric, and the same two questions answered: which combinations of parameters does the experiment determine, and where does the optimiser spend its time. We suggest that these diagnostics should accompany any reported multi-parameter extraction.
+
+% =====================================================================================
+\section{Conclusions}\label{sec:conclusions}
+We have combined a differentiable transfer-matrix forward model with Bayesian-seeded gradient descent to extract thickness and complex refractive index of every layer of a multi-layer sample from a single THz-TDS transmission trace, validated it on a simulated five-layer stack and mapped its failure modes against noise and pulse width, and applied it to an experimental quartz-on-silicon bilayer, where three independent starts converge to $n_{\mathrm{q}}=1.964$, $d_{\mathrm{q}}=\SI{994}{\micro\metre}$, $n_{\mathrm{Si}}=3.447$, $d_{\mathrm{Si}}=\SI{381}{\micro\metre}$. A direct analysis of the loss landscape of that fit shows a sensitivity spectrum spanning three and a half orders of magnitude, a two-phase descent in which \SI{92}{\percent} of the iterations go to the extinction coefficients, a noise-limited thickness precision of tens of nanometres, an unphysical negative $\kap_{\mathrm{Si}}$ that a positivity constraint drives to zero at negligible cost in loss, and a spread of \SI{\pm1.5}{\percent} in thickness between fits with different loss functions and optimisers that agree on optical thickness to \SI{0.03}{\percent}. The extraction is limited by the frequency-independent model, not by noise or by the optimiser. Replacing the constant index of each layer by a cubic $n(f)$ and a quadratic $\kap(f)$ confirms this: the misfit falls by \SI{34}{\percent}, the pulse-shape residual disappears, and the quartz layer acquires a physically sensible, linearly rising extinction ($n=1.967$ at \SI{1}{THz}, $\alpha\approx\SI{1.8}{cm^{-1}}$) while the silicon stays lossless. The residual that remains, twelve times the noise floor, has the periodicity of the Fabry--P\'erot echoes, and the thicknesses move along the optical-thickness valley rather than out of it; the part of the misfit that carries the thickness information is the part a dispersive index does not touch, so an independent thickness or a known index per layer remains necessary for sub-percent thickness accuracy.
+
+
+\begin{backmatter}
+\bmsection{Funding} \todo{[to be added]}
+
+\bmsection{Acknowledgments} \todo{[to be added]}
+
+\bmsection{Disclosures} The authors declare no conflicts of interest. \todo{[confirm; note industrial affiliation of one author]}
+
+\bmsection{Data availability} The measured traces, the fitting and landscape-analysis code (including the dispersive-fit notebook \texttt{QuartzSI\_\-dispersive\_\-Adam.ipynb}) and the trajectories underlying all figures are available from the authors upon reasonable request. \todo{[or a repository link]}
+\end{backmatter}
+
+\bibliography{refs}
+
+\end{document}
