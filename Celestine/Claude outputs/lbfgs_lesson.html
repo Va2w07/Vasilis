@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L-BFGS, from the gradient up — an interactive lesson</title>
+<style>
+:root{--bg:#fafaf8;--ink:#1f2329;--muted:#6b7280;--line:#e3e4e8;--lbfgs:#2563eb;--gd:#e07a1f;--grad:#c81e1e;--newton:#15803d;--panel:#fff;--hl:#fff7d6}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 -apple-system,system-ui,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header{padding:18px 24px 0}
+h1{margin:0;font-size:21px;font-weight:600}
+.sub{color:var(--muted);margin:4px 0 12px;max-width:980px}
+nav{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:0 24px}
+nav button{font:inherit;font-size:14px;padding:8px 14px;border:none;background:none;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;margin-bottom:-1px}
+nav button.on{color:var(--ink);border-bottom-color:var(--lbfgs);font-weight:600}
+section.tab{display:none;padding:18px 24px 30px}
+section.tab.on{display:block}
+.lesson{max-width:980px}
+.lesson h2{font-size:19px;margin:0 0 8px}
+.lesson h3{font-size:15px;margin:18px 0 6px}
+.lesson p{margin:8px 0}
+.eq{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:10px 0;font-size:16px;text-align:center;font-family:"Times New Roman",Times,serif}
+.eq i{font-style:italic}
+.term{background:var(--hl);border-radius:4px;padding:0 4px;font-weight:600}
+.aside{border-left:3px solid var(--lbfgs);background:#f3f6fd;padding:8px 12px;border-radius:0 8px 8px 0;margin:10px 0;font-size:14px}
+.thz{border-left:3px solid var(--gd);background:#fff6ee;padding:8px 12px;border-radius:0 8px 8px 0;margin:10px 0;font-size:14px}
+.demo{display:grid;grid-template-columns:minmax(420px,1fr) minmax(320px,440px);gap:16px;margin:16px 0;align-items:start;max-width:1200px}
+@media (max-width:900px){.demo{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+canvas.plot{width:100%;height:auto;display:block;border-radius:6px;cursor:crosshair}
+.controls{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px;font-size:14px}
+.controls label{display:flex;align-items:center;gap:6px;color:var(--muted)}
+select,button.b{font:inherit;font-size:14px;padding:5px 10px;border-radius:6px;border:1px solid #cfd2d8;background:#fff;color:var(--ink)}
+button.b{cursor:pointer}
+button.primary{background:var(--lbfgs);border-color:var(--lbfgs);color:#fff}
+input[type=range]{width:120px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.sw{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+.card h4{font-size:12.5px;margin:12px 0 5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+.card h4:first-child{margin-top:0}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+td,th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{color:var(--muted);font-weight:500}
+td:first-child,th:first-child{text-align:left}
+.stats{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-variant-numeric:tabular-nums;font-size:13.5px}
+.stats b{font-weight:600}
+.note{background:#f3f5f9;border-radius:8px;padding:10px 12px;font-size:13.5px;line-height:1.5}
+.small{font-size:12.5px;color:var(--muted)}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11.5px;font-weight:600}
+.ok{background:#dcfce7;color:#166534}.bad{background:#fee2e2;color:#991b1b}
+.mat{display:inline-grid;grid-template-columns:auto auto;gap:1px 10px;padding:2px 8px;border-left:1.5px solid #333;border-right:1.5px solid #333;border-radius:6px;font-variant-numeric:tabular-nums;vertical-align:middle;margin:2px 3px}
+.trace{font-size:13px;font-variant-numeric:tabular-nums;line-height:1.7}
+.trace .l{display:block;padding:1px 6px;border-radius:4px}
+.trace .l1{background:#fdf2f2}.trace .l2{background:#f0f6ff}.trace .ls{background:#f2fbf4}
+.trace b{font-weight:600}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:8px 18px;max-width:980px}
+dt{font-weight:600}
+dd{margin:0}
+.row{display:flex;gap:14px;align-items:flex-start}
+canvas.inset{width:160px;height:160px;border:1px solid var(--line);border-radius:6px;background:#fff;flex:none}
+.next{margin-top:22px;font-size:14px}
+.next button{font:inherit;color:var(--lbfgs);background:none;border:1px solid var(--lbfgs);border-radius:6px;padding:6px 12px;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>L-BFGS, from the gradient up</h1>
+  <p class="sub">A five-step lesson. Each tab introduces one idea and the terms that go with it, with an interactive demo you can poke at. Highlighted words are defined where they first appear and collected in the glossary.</p>
+</header>
+<nav id="nav">
+  <button data-t="t1" class="on">1 · Gradient descent</button>
+  <button data-t="t2">2 · Newton's method</button>
+  <button data-t="t3">3 · Quasi-Newton &amp; BFGS</button>
+  <button data-t="t4">4 · L-BFGS</button>
+  <button data-t="t5">5 · Playground</button>
+  <button data-t="t6">Glossary</button>
+</nav>
+
+<!-- ======================= TAB 1 ======================= -->
+<section class="tab on" id="t1">
+<div class="lesson">
+<h2>1 · The landscape, the gradient, and why gradient descent zig-zags</h2>
+<p>Everything starts with an <span class="term">objective function</span> <i>f</i>(<b>x</b>): a single number we want to make as small as possible, computed from a vector of <span class="term">parameters</span> <b>x</b> = (x₁, …, x<sub>n</sub>). Picture <i>f</i> as a landscape over the parameters: the optimiser is a hiker in fog who can only feel the ground under their feet.</p>
+<div class="thz">In your THz extraction, <b>x</b> is (n, κ, d) for every layer — 6 numbers for the quartz/Si bilayer, 15 for the five-layer stack — and <i>f</i> is the rMSE between the measured and simulated pulse. One evaluation of <i>f</i> is one run of the transfer-matrix model.</div>
+<p>The hiker's one instrument is the <span class="term">gradient</span> ∇<i>f</i>: the vector of partial derivatives (∂<i>f</i>/∂x₁, …, ∂<i>f</i>/∂x<sub>n</sub>). Autograd gives it to you for the price of about one extra model evaluation. Three facts about it matter:</p>
+<p>(a) It points in the direction of <b>steepest increase</b>, so −∇<i>f</i> is the locally steepest way down. (b) Its length says how steep the slope is. (c) It is always <b>perpendicular to the contour line</b> through the point.</p>
+<p><span class="term">Gradient descent</span> just walks downhill:</p>
+<div class="eq"><b>x</b><sub>k+1</sub> = <b>x</b><sub>k</sub> − α ∇<i>f</i>(<b>x</b><sub>k</sub>)</div>
+<p>where α is the <span class="term">step size</span> (machine-learning people say <i>learning rate</i>). Here is the whole problem with it: the gradient knows the <i>direction</i> but says nothing about <i>how far</i> to go, and the right distance is different in different directions. In the bowl below the loss rises 25 times faster along <i>y</i> than along <i>x</i>. A step size small enough to be stable in <i>y</i> (α &lt; 2/25 = 0.08) is a crawl in <i>x</i>. The result is the famous zig-zag: the hiker bounces across the narrow valley while creeping along it.</p>
+<p>How bad this is depends on the <span class="term">condition number</span> κ = (steepest curvature)/(flattest curvature). Roughly, gradient descent needs on the order of κ iterations. The bowl has κ = 25.</p>
+<div class="thz">Your sensitivity analysis of the quartz/Si fit found σ₁/σ₆ ≈ 5500 between the "total optical path" direction and the κ directions. That is why Adam spent 18 000 of 20 000 iterations drifting in κ: it was the zig-zag in six dimensions.</div>
+<p>A <span class="term">line search</span> replaces the fixed α by a trial: try a step, and if <i>f</i> did not decrease enough, halve it and try again. Here it helps to name the <span class="term">search direction</span> <b>p</b>: the direction the optimiser has decided to move in, so that every step has the form <b>x</b> + α<b>p</b>. For gradient descent <b>p</b> = −∇<i>f</i>; for Newton and L-BFGS it will be something better. The "enough" test is the <span class="term">Armijo condition</span></p>
+<div class="eq"><i>f</i>(<b>x</b> + α<b>p</b>) ≤ <i>f</i>(<b>x</b>) + c · α · (∇<i>f</i> · <b>p</b>), &nbsp;&nbsp; c ≈ 10⁻⁴</div>
+<p>The quantity ∇<i>f</i>·<b>p</b> is the slope of <i>f</i> along <b>p</b> (negative for a downhill direction), so α·∇<i>f</i>·<b>p</b> is the decrease a straight-line model of <i>f</i> would promise for that step; the condition only asks for a small fraction c of it. If the trial α fails the test, α is halved and the test repeated. It removes the instability but not the zig-zag — tick the box in the demo to see it. The direction itself is what needs fixing, and for that we need to know the <i>curvature</i>. That is tab 2.</p>
+</div>
+
+<div class="demo">
+  <div class="card">
+    <div class="controls">
+      <label>step size α <input type="range" id="t1a" min="0.005" max="0.095" step="0.005" value="0.04"> <b id="t1av">0.04</b></label>
+      <label><input type="checkbox" id="t1ls"> use a backtracking line search instead</label>
+      <button class="b primary" id="t1step">Step ▸</button><button class="b" id="t1run">Run</button><button class="b" id="t1reset">Reset</button>
+    </div>
+    <canvas class="plot" id="t1c" width="1000" height="640"></canvas>
+    <div class="legend"><span><i class="sw" style="background:var(--grad)"></i>−∇f at the current point</span><span><i class="sw" style="background:var(--gd)"></i>gradient-descent path</span><span>★ minimum · click to restart from there</span></div>
+  </div>
+  <div class="card">
+    <h4>Bowl  f = ½(x² + 25y²)</h4>
+    <div class="stats" id="t1stats"></div>
+    <h4>This step, in numbers</h4>
+    <div class="trace" id="t1trace"></div>
+    <h4>Reading it</h4>
+    <div class="note" id="t1note"></div>
+  </div>
+</div>
+<div class="next"><button data-go="t2">Next: Newton's method — use the curvature →</button></div>
+</section>
+
+<!-- ======================= TAB 2 ======================= -->
+<section class="tab" id="t2">
+<div class="lesson">
+<h2>2 · Newton's method: divide the gradient by the curvature</h2>
+<p>Start in one dimension. Near a point x the function looks like a parabola, its second-order <span class="term">Taylor model</span>:</p>
+<div class="eq"><i>f</i>(x + p) ≈ <i>f</i>(x) + <i>f</i>′(x)·p + ½ <i>f</i>″(x)·p²</div>
+<p><i>f</i>′ is the slope (the gradient), <i>f</i>″ is the <span class="term">curvature</span>: how fast the slope itself changes. Where is the bottom of that parabola? Set its derivative to zero: <i>f</i>′ + <i>f</i>″ p = 0, so</p>
+<div class="eq">p<sub>Newton</sub> = − <i>f</i>′(x) / <i>f</i>″(x)</div>
+<p>That is the whole idea: <b>gradient divided by curvature</b>. Steep slope but very curved (a narrow valley) → small step. Gentle slope and almost flat → large step. Note that there is no α any more — the curvature fixes the scale of the step, and on an exact parabola one step lands on the minimum.</p>
+<p>In <i>n</i> dimensions the curvature is not one number but a matrix, the <span class="term">Hessian</span> <b>H</b>, with entries H<sub>ij</sub> = ∂²<i>f</i>/∂x<sub>i</sub>∂x<sub>j</sub>. It is symmetric and <i>n</i>×<i>n</i>. The Taylor model and its minimiser become</p>
+<div class="eq"><i>f</i>(<b>x</b> + <b>p</b>) ≈ <i>f</i> + ∇<i>f</i>ᵀ<b>p</b> + ½ <b>p</b>ᵀ<b>H</b><b>p</b> &nbsp;&nbsp;⟹&nbsp;&nbsp; <b>p</b><sub>Newton</sub> = − <b>H</b><sup>−1</sup> ∇<i>f</i></div>
+<p>"Dividing by the curvature" is now "multiplying by the <span class="term">inverse Hessian</span>". Geometrically, <b>H</b><sup>−1</sup> is a stretch: it shrinks the gradient along directions where the landscape is steeply curved and stretches it along flat directions, so the step points at the bottom of the valley instead of across it. The ellipse in the demo's inset is exactly that stretch, drawn as what <b>H</b><sup>−1</sup> does to a unit circle. On the bowl, Newton's step is one jump to the minimum from anywhere, whatever the condition number.</p>
+<h3>So why not always use Newton?</h3>
+<p>Three reasons, and quasi-Newton methods are the answer to all three.</p>
+<p><b>Cost.</b> The Hessian has <i>n</i>(<i>n</i>+1)/2 second derivatives, and solving <b>H p</b> = −∇<i>f</i> costs about <i>n</i>³ operations. For your 15 parameters that is cheap; for a 10⁶-parameter network it is impossible. More to the point, we only ever <i>use</i> <b>H</b><sup>−1</sup> multiplied by a vector — we never need the matrix itself.</p>
+<p><b>Validity.</b> The step goes to the <i>stationary point</i> of the parabola, which is a minimum only if the curvature is positive in every direction — the Hessian must be <span class="term">positive definite</span> (<b>p</b>ᵀ<b>H p</b> &gt; 0 for every <b>p</b>, i.e. bowl-shaped all round). Far from the minimum it often is not. Slide the 1-D demo into the hump between the two wells and watch Newton head <i>uphill</i> to the top.</p>
+<p><b>Trust.</b> The parabola is only a local model; a full Newton step far away can overshoot. Practical methods keep a line search as a safety net and try α = 1 first, which is accepted almost always near the solution.</p>
+<div class="thz">In the loss-landscape notes you found that the autograd Hessian of the MAE-dominated loss gave a spurious negative eigenvalue — the "validity" problem in the wild. The sensitivity matrix <b>J</b>ᵀ<b>J</b> you used instead is the Gauss–Newton approximation of the Hessian, which is always positive semi-definite.</div>
+</div>
+
+<div class="demo">
+  <div class="card">
+    <div class="controls">
+      <label>point x₀ <input type="range" id="t2x" min="-1.7" max="1.7" step="0.01" value="1.45"> <b id="t2xv">1.45</b></label>
+    </div>
+    <canvas class="plot" id="t2c1" width="1000" height="520"></canvas>
+    <div class="legend"><span>1-D:  f(x) = x⁴ − 2x² + 0.5x</span><span><i class="sw" style="background:var(--grad)"></i>tangent (slope f′)</span><span><i class="sw" style="background:var(--newton)"></i>Taylor parabola (curvature f″)</span><span>● Newton target &nbsp; ● gradient step (α = 0.05)</span></div>
+  </div>
+  <div class="card">
+    <h4>At x₀</h4>
+    <div class="stats" id="t2stats"></div>
+    <h4>Reading it</h4>
+    <div class="note" id="t2note"></div>
+  </div>
+</div>
+
+<div class="demo">
+  <div class="card">
+    <div class="controls">
+      <label>Landscape <select id="t2sel"></select></label>
+      <button class="b primary" id="t2step">Newton step ▸</button><button class="b" id="t2reset">Reset</button>
+    </div>
+    <canvas class="plot" id="t2c2" width="1000" height="640"></canvas>
+    <div class="legend"><span><i class="sw" style="background:var(--grad)"></i>−∇f</span><span><i class="sw" style="background:var(--newton);height:5px"></i>Newton direction p = −H⁻¹∇f</span><span>★ minimum · click to restart from there</span></div>
+  </div>
+  <div class="card">
+    <h4>At the current point</h4>
+    <div class="stats" id="t2stats2"></div>
+    <h4>The matrices</h4>
+    <div id="t2mats" style="font-size:13.5px"></div>
+    <div class="row" style="margin-top:10px">
+      <canvas class="inset" id="t2ins" width="320" height="320"></canvas>
+      <div class="small">What H⁻¹ does to a unit circle (shape only). <span style="color:#9aa0a8">Dotted</span>: the identity — what gradient descent assumes. <span style="color:var(--newton)">Green</span>: H⁻¹. The Newton step is the green ellipse applied to −∇f: long axis = direction it dares to move far along.</div>
+    </div>
+  </div>
+</div>
+<div class="next"><button data-go="t3">Next: learn the curvature from the steps you take →</button></div>
+</section>
+
+<!-- ======================= TAB 3 ======================= -->
+<section class="tab" id="t3">
+<div class="lesson">
+<h2>3 · Quasi-Newton: measure the curvature with the steps you take anyway</h2>
+<p>Back to one dimension. Suppose you cannot compute <i>f</i>″, but you have just taken a step from x₀ to x₁ and you evaluated the gradient at both ends. You moved by</p>
+<div class="eq">s = x₁ − x₀ &nbsp;&nbsp;(the <span class="term">step</span>) &nbsp;&nbsp;&nbsp;&nbsp; y = <i>f</i>′(x₁) − <i>f</i>′(x₀) &nbsp;&nbsp;(the <span class="term">change in gradient</span>)</div>
+<p>Curvature is "how fast the slope changes", so <i>f</i>″ ≈ y / s. This is the <span class="term">secant</span> (finite-difference) estimate, and it costs nothing: both gradients were computed anyway. The inverse curvature is s / y, so a Newton-like step from x₁ is</p>
+<div class="eq">x₂ = x₁ − (s / y) · <i>f</i>′(x₁)</div>
+<p>Play with the first demo: the secant estimate is usually within a few percent of the true <i>f</i>″ once the two points are close, and the secant step lands nearly where Newton would.</p>
+<h3>Several dimensions: one pair, one direction</h3>
+<p>Keep the same two measurements, now as vectors: the <span class="term">curvature pair</span></p>
+<div class="eq"><b>s</b><sub>k</sub> = <b>x</b><sub>k+1</sub> − <b>x</b><sub>k</sub> &nbsp;&nbsp;&nbsp;&nbsp; <b>y</b><sub>k</sub> = ∇<i>f</i>(<b>x</b><sub>k+1</sub>) − ∇<i>f</i>(<b>x</b><sub>k</sub>)</div>
+<p>For a quadratic landscape the Hessian relates them exactly: <b>H s</b> = <b>y</b>. So whatever matrix we use as our estimate of the inverse Hessian — call it <b>H</b><sub>k</sub> (from here on <b>H</b> without a subscript means the true Hessian, <b>H</b><sub>k</sub> our estimate of its inverse) — we want it to satisfy the <span class="term">secant equation</span></p>
+<div class="eq"><b>H</b><sub>k+1</sub> <b>y</b><sub>k</sub> = <b>s</b><sub>k</sub></div>
+<p>Read it as: "if the gradient changes by <b>y</b>, the position must have changed by <b>s</b>." The catch is that this is <i>n</i> equations for <i>n</i>(<i>n</i>+1)/2 unknowns. One pair tells you the curvature along the direction you walked and nothing about the others. Quasi-Newton methods therefore accumulate: every step contributes one pair, and after a handful of steps in different directions the estimate is good everywhere that matters.</p>
+<h3>The BFGS update</h3>
+<p><span class="term">BFGS</span> (Broyden–Fletcher–Goldfarb–Shanno, 1970) is the rule for folding a new pair into the current estimate. Of all matrices that satisfy the secant equation and stay symmetric, it picks the one closest to the old <b>H</b><sub>k</sub> — change as little as possible, learn only what the new pair says:</p>
+<div class="eq"><b>H</b><sub>k+1</sub> = (<b>I</b> − ρ <b>s y</b>ᵀ) <b>H</b><sub>k</sub> (<b>I</b> − ρ <b>y s</b>ᵀ) + ρ <b>s s</b>ᵀ, &nbsp;&nbsp;&nbsp; ρ = 1 / (<b>y</b>ᵀ<b>s</b>)</div>
+<p>Each piece has a job. The scalar ρ = 1/(<b>s</b>·<b>y</b>) is the normalisation that makes the 1-D secant identity work in vector form. The factor (<b>I</b> − ρ <b>y s</b>ᵀ) acting on a vector <b>v</b> gives <b>v</b> − <b>y</b> (<b>s</b>·<b>v</b>)/(<b>s</b>·<b>y</b>): it <i>removes</i> from <b>v</b> the part that lies along the direction just probed — "forget what the old estimate believed about this direction". The sandwich with the transposed factor on the other side keeps the result symmetric. Finally ρ <b>s s</b>ᵀ <i>inserts</i> the freshly measured inverse curvature: applied to <b>y</b> it returns <b>s</b> (<b>s</b>·<b>y</b>)/(<b>s</b>·<b>y</b>) = <b>s</b>, exactly the secant equation. You can check that the first term kills <b>y</b> outright, since (<b>I</b> − ρ <b>y s</b>ᵀ)<b>y</b> = <b>y</b> − <b>y</b> = 0, so <b>H</b><sub>k+1</sub><b>y</b> = <b>s</b> as required.</p>
+<p>Two more facts. The update changes <b>H</b><sub>k</sub> only in the plane spanned by <b>s</b> and <b>H</b><sub>k</sub><b>y</b> — it is a <span class="term">rank-two update</span>. And <b>H</b><sub>k+1</sub> stays positive definite (so −<b>H</b><sub>k+1</sub>∇<i>f</i> is still a downhill direction) <i>if and only if</i> the <span class="term">curvature condition</span> <b>s</b>·<b>y</b> &gt; 0 holds: the measured curvature along the step must be positive. A <span class="term">Wolfe line search</span> (Armijo plus a check that the slope along <b>p</b> has become less negative) guarantees this. Codes that skip it must throw the pair away when <b>s</b>·<b>y</b> ≤ 0, or the estimate turns into nonsense.</p>
+<div class="thz">This is the NaN you saw with "plain full-band L-BFGS … unbounded line search" in the five-layer diagnosis: a step that walks through a region of negative curvature, a pair with <b>s</b>·<b>y</b> ≤ 0 that is not rejected, and the direction stops being a descent direction. The strong-Wolfe search used in the limits study is the fix.</div>
+<p>What BFGS still needs is the full <i>n</i>×<i>n</i> matrix <b>H</b><sub>k</sub> in memory. Tab 4 removes that.</p>
+</div>
+
+<div class="demo">
+  <div class="card">
+    <div class="controls">
+      <label>x₀ <input type="range" id="t3x0" min="-1.7" max="1.7" step="0.01" value="1.6"> <b id="t3x0v">1.60</b></label>
+      <label>x₁ <input type="range" id="t3x1" min="-1.7" max="1.7" step="0.01" value="1.2"> <b id="t3x1v">1.20</b></label>
+    </div>
+    <canvas class="plot" id="t3c1" width="1000" height="520"></canvas>
+    <div class="legend"><span>1-D:  f(x) = x⁴ − 2x² + 0.5x</span><span><i class="sw" style="background:var(--grad)"></i>tangents at x₀ and x₁</span><span><i class="sw" style="background:var(--lbfgs)"></i>secant parabola (curvature y/s)</span><span>● secant step &nbsp; ● true Newton step</span></div>
+  </div>
+  <div class="card">
+    <h4>The secant estimate</h4>
+    <div class="stats" id="t3stats"></div>
+    <h4>Reading it</h4>
+    <div class="note" id="t3note"></div>
+  </div>
+</div>
+
+<div class="demo">
+  <div class="card">
+    <div class="controls">
+      <label>Landscape <select id="t3sel"></select></label>
+      <button class="b primary" id="t3step">BFGS step ▸</button><button class="b" id="t3run">Run</button><button class="b" id="t3reset">Reset</button>
+    </div>
+    <canvas class="plot" id="t3c2" width="1000" height="640"></canvas>
+    <div class="legend"><span><i class="sw" style="background:var(--grad)"></i>−∇f</span><span><i class="sw" style="background:var(--lbfgs);height:5px"></i>BFGS direction p = −H<sub>k</sub>∇f</span><span><i class="sw" style="background:var(--lbfgs)"></i>path (thick = latest pair s)</span><span>★ minimum · click to restart from there</span></div>
+  </div>
+  <div class="card">
+    <h4>Current estimate</h4>
+    <div class="stats" id="t3stats2"></div>
+    <h4>How the last pair updated H<sub>k</sub></h4>
+    <div id="t3upd" style="font-size:13.5px">—</div>
+    <div class="row" style="margin-top:10px">
+      <canvas class="inset" id="t3ins" width="320" height="320"></canvas>
+      <div class="small"><span style="color:var(--lbfgs)">Blue</span>: the estimate H<sub>k</sub> as an ellipse. <span style="color:var(--newton)">Green dashed</span>: the true H⁻¹ at this point. <span style="color:#9aa0a8">Dotted</span>: identity. Watch the blue ellipse start as a circle and get stretched along each new s.</div>
+    </div>
+  </div>
+</div>
+<div class="next"><button data-go="t4">Next: keep only the last m pairs →</button></div>
+</section>
+
+<!-- ======================= TAB 4 ======================= -->
+<section class="tab" id="t4">
+<div class="lesson">
+<h2>4 · L-BFGS: the same idea without ever building the matrix</h2>
+<p>BFGS stores an <i>n</i>×<i>n</i> matrix and does <i>n</i>² work per step. <span class="term">L-BFGS</span> (<i>limited-memory</i> BFGS, Nocedal 1980) notices two things. First, <b>H</b><sub>k</sub> is nothing but the starting guess <b>H</b>₀ with <i>k</i> rank-two updates stacked on top, and each update is fully described by its pair (<b>s</b><sub>i</sub>, <b>y</b><sub>i</sub>). Second, we only ever need the <i>product</i> <b>H</b><sub>k</sub>∇<i>f</i>, never <b>H</b><sub>k</sub> itself. So: keep only the last <i>m</i> pairs (the <span class="term">memory</span>, typically m = 5–20; SciPy's default is 10), and compute <b>H</b><sub>k</sub>∇<i>f</i> by applying those m updates one after another to the vector ∇<i>f</i>. Storage 2<i>mn</i> numbers, work about 4<i>mn</i> per step.</p>
+<p>Throwing away old pairs is also a feature. On a landscape that is not a quadratic, the curvature measured ten steps ago describes a different place; a short memory keeps the estimate local.</p>
+<h3>The starting guess, γ</h3>
+<p>Without any pairs the best we can do is a scalar: <b>H</b>₀ = γ <b>I</b>, the same inverse curvature in every direction. L-BFGS sets it from the <i>newest</i> pair,</p>
+<div class="eq">γ<sub>k</sub> = (<b>s</b>·<b>y</b>) / (<b>y</b>·<b>y</b>)</div>
+<p>which is the 1-D secant estimate s/y of tab 3 projected onto the direction of <b>y</b>. Its only job is to get the <i>scale</i> of the step right, so that the trial step α = 1 is usually accepted by the line search. The directional information comes from the pairs.</p>
+<h3>The two-loop recursion, line by line</h3>
+<p>Write <b>V</b><sub>i</sub> = <b>I</b> − ρ<sub>i</sub> <b>y</b><sub>i</sub><b>s</b><sub>i</sub>ᵀ. Stacking m BFGS updates on γ<b>I</b> gives</p>
+<div class="eq"><b>H</b><sub>k</sub> = <b>V</b>ᵀ<sub>k−1</sub>···<b>V</b>ᵀ<sub>k−m</sub> (γ<b>I</b>) <b>V</b><sub>k−m</sub>···<b>V</b><sub>k−1</sub> + ρ<sub>k−1</sub><b>s</b><sub>k−1</sub><b>s</b>ᵀ<sub>k−1</sub> + <b>V</b>ᵀ<sub>k−1</sub> ρ<sub>k−2</sub><b>s</b><sub>k−2</sub><b>s</b>ᵀ<sub>k−2</sub> <b>V</b><sub>k−1</sub> + ···</div>
+<p>Ugly, but every factor is "remove the component along one <b>s</b><sub>i</sub>" or "insert the measured curvature along one <b>s</b><sub>i</sub>", and applying them to a vector in the right order is cheap. That ordered application is the <span class="term">two-loop recursion</span>:</p>
+<div class="trace" style="max-width:980px;margin:8px 0">
+<span class="l">① &nbsp;<b>q</b> ← ∇<i>f</i>(<b>x</b><sub>k</sub>) &nbsp;— the vector we are going to transform into the step.</span>
+<span class="l l1">② &nbsp;<b>First loop, newest pair → oldest.</b> For each stored pair i:&nbsp; α<sub>i</sub> ← ρ<sub>i</sub> (<b>s</b><sub>i</sub>·<b>q</b>) &nbsp;&nbsp;then&nbsp;&nbsp; <b>q</b> ← <b>q</b> − α<sub>i</sub> <b>y</b><sub>i</sub></span>
+<span class="l" style="padding-left:28px">α<sub>i</sub> is "how much of <b>q</b> lies along <b>s</b><sub>i</sub>", measured in units of <b>s</b><sub>i</sub>·<b>y</b><sub>i</sub>. Subtracting α<sub>i</sub><b>y</b><sub>i</sub> is the factor <b>V</b><sub>i</sub>: it strips out the component of the gradient that pair i can account for. The α<sub>i</sub> are kept for the second loop.</span>
+<span class="l ls">③ &nbsp;<b>Scale.</b> &nbsp;<b>r</b> ← γ <b>q</b> &nbsp;— apply the isotropic guess <b>H</b>₀ to whatever is left of the gradient.</span>
+<span class="l l2">④ &nbsp;<b>Second loop, oldest pair → newest.</b> For each i:&nbsp; β<sub>i</sub> ← ρ<sub>i</sub> (<b>y</b><sub>i</sub>·<b>r</b>) &nbsp;&nbsp;then&nbsp;&nbsp; <b>r</b> ← <b>r</b> + (α<sub>i</sub> − β<sub>i</sub>) <b>s</b><sub>i</sub></span>
+<span class="l" style="padding-left:28px">This is <b>V</b><sub>i</sub>ᵀ followed by the ρ<sub>i</sub><b>s</b><sub>i</sub><b>s</b><sub>i</sub>ᵀ term, merged into one line: it puts back, <i>along</i> <b>s</b><sub>i</sub>, the right amount of step for the gradient component that was removed in loop 1 — the measured inverse curvature along that direction.</span>
+<span class="l">⑤ &nbsp;<b>p</b> ← −<b>r</b>. &nbsp;Now <b>r</b> = <b>H</b><sub>k</sub>∇<i>f</i> exactly, with the matrix never formed. Line-search along <b>p</b> starting at α = 1, move, store the new pair, drop the oldest if there are more than m.</span>
+</div>
+<p>A way to feel what it computes: in the directions spanned by the stored <b>s</b><sub>i</sub> the step is Newton-like, using the measured curvatures; in every other direction it is γ times steepest descent. With m ≥ n independent pairs on a quadratic, the recursion reproduces the exact <b>H</b><sup>−1</sup>, which is why in the 2-D playground the blue ellipse snaps onto the green one after two or three steps.</p>
+<div class="thz">For your 15-parameter stack with m = 10 the recursion costs 40·15 flops per iteration — nothing next to the transfer-matrix evaluation. The coarse-to-fine trick that gave 12/12 convergence works <i>with</i> the memory: the smoothed loss has a gentler, more quadratic valley, so the pairs collected there describe the curvature well, and the memory is refreshed as the band opens up.</div>
+<p>The playground on the next tab runs exactly these five lines and prints every number.</p>
+</div>
+<div class="next"><button data-go="t5">Next: the playground →</button></div>
+</section>
+
+<!-- ======================= TAB 5 ======================= -->
+<section class="tab" id="t5">
+<div class="lesson">
+<h2>5 · Playground: watch the recursion work</h2>
+<p>Step through L-BFGS. The thick segments on the path are the pairs currently in memory; the panel prints the two-loop recursion with the live numbers for the <i>next</i> step, and the result of the last line search. Gradient descent with the same backtracking line search runs alongside in orange.</p>
+</div>
+<div class="demo" style="grid-template-columns:minmax(520px,1fr) 480px">
+  <div class="card">
+    <div class="controls">
+      <label>Landscape <select id="fsel"></select></label>
+      <label>memory m <input type="range" id="mem" min="1" max="8" value="3"> <b id="memv">3</b></label>
+      <button class="b primary" id="step">Step ▸</button><button class="b" id="run">Run</button><button class="b" id="reset">Reset</button>
+      <label><input type="checkbox" id="showgd" checked> gradient descent</label>
+    </div>
+    <canvas class="plot" id="plot" width="1100" height="860"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--lbfgs)"></i>L-BFGS path (thick = pairs in memory)</span>
+      <span><i class="sw" style="background:var(--gd)"></i>gradient descent</span>
+      <span><i class="sw" style="background:var(--grad)"></i>−∇f</span>
+      <span><i class="sw" style="background:var(--lbfgs);height:5px"></i>p = −H<sub>k</sub>∇f</span>
+      <span>★ minimum · click to restart · space/→ to step</span>
+    </div>
+  </div>
+  <div class="card">
+    <h4>Where we are</h4>
+    <div class="stats" id="stats"></div>
+    <h4>Memory: the last m pairs</h4>
+    <div class="tw"><table id="memtab"></table></div>
+    <h4>Next direction: the two-loop recursion with live numbers</h4>
+    <div class="trace" id="looptrace"></div>
+    <div class="row" style="margin-top:10px">
+      <canvas class="inset" id="inset" width="320" height="320"></canvas>
+      <div class="small">Inverse-curvature picture at x<sub>k</sub> (shape only): <span style="color:var(--lbfgs)">■</span> L-BFGS H<sub>k</sub>, <span style="color:var(--newton)">■</span> true H⁻¹, <span style="color:#9aa0a8">■</span> identity (steepest descent). p is the blue ellipse applied to −∇f.</div>
+    </div>
+    <h4>Last step</h4>
+    <div id="laststep" class="small">—</div>
+    <h4>What is going on</h4>
+    <div class="note" id="note"></div>
+  </div>
+</div>
+</section>
+
+<!-- ======================= GLOSSARY ======================= -->
+<section class="tab" id="t6">
+<div class="lesson">
+<h2>Glossary</h2>
+<dl>
+<dt>objective / loss f(x)</dt><dd>The number being minimised, a function of the parameter vector x. In the THz fits: rMSE between measured and simulated pulses.</dd>
+<dt>gradient ∇f</dt><dd>Vector of first partial derivatives. Points uphill, perpendicular to contours, length = steepness. Autograd supplies it.</dd>
+<dt>Hessian H</dt><dd>Symmetric n×n matrix of second derivatives H<sub>ij</sub> = ∂²f/∂x<sub>i</sub>∂x<sub>j</sub>: the curvature in every direction. Its eigenvectors are the principal axes of the local bowl, its eigenvalues the curvatures along them.</dd>
+<dt>positive definite</dt><dd>pᵀHp &gt; 0 for every p ≠ 0: curvature positive in all directions, so the quadratic model has a unique minimum. Required for −H⁻¹∇f to be a descent direction.</dd>
+<dt>condition number κ</dt><dd>λ<sub>max</sub>/λ<sub>min</sub> of the Hessian. Gradient descent needs ~κ iterations; Newton-type methods are insensitive to it.</dd>
+<dt>step size α / learning rate</dt><dd>Scalar multiplying the search direction. Fixed in plain gradient descent; chosen by a line search in Newton-type methods (α = 1 tried first).</dd>
+<dt>search direction p</dt><dd>The direction of the next move; every iteration is x<sub>k+1</sub> = x<sub>k</sub> + α p<sub>k</sub>. Gradient descent: p = −∇f. Newton: p = −H⁻¹∇f. BFGS / L-BFGS: p = −H<sub>k</sub>∇f with the estimated H<sub>k</sub>. A <i>descent direction</i> is one with ∇f·p &lt; 0 (points downhill).</dd>
+<dt>line search</dt><dd>Procedure that picks α along a given direction p. <i>Backtracking</i>: start at α = 1, halve until the Armijo condition holds. <i>Wolfe</i>: Armijo plus a curvature condition on the new slope, which guarantees s·y &gt; 0.</dd>
+<dt>Armijo condition</dt><dd>f(x+αp) ≤ f(x) + c₁ α ∇f·p with c₁ ≈ 10⁻⁴: the decrease must be at least a small fraction of what the linear model promised.</dd>
+<dt>Newton step</dt><dd>p = −H⁻¹∇f: minimiser of the local quadratic model. Exact in one step on a quadratic.</dd>
+<dt>secant equation</dt><dd>H<sub>k+1</sub> y<sub>k</sub> = s<sub>k</sub>: the inverse-Hessian estimate must map the observed gradient change back to the observed step. The n-D version of f″ ≈ y/s.</dd>
+<dt>curvature pair (s<sub>k</sub>, y<sub>k</sub>)</dt><dd>s<sub>k</sub> = x<sub>k+1</sub> − x<sub>k</sub> (the step), y<sub>k</sub> = ∇f<sub>k+1</sub> − ∇f<sub>k</sub> (the gradient change). One pair = one directional curvature measurement.</dd>
+<dt>curvature condition s·y &gt; 0</dt><dd>Measured curvature along the step is positive. Keeps the BFGS estimate positive definite. Pairs violating it must be rejected (or prevented by a Wolfe line search).</dd>
+<dt>ρ<sub>k</sub></dt><dd>1/(s<sub>k</sub>·y<sub>k</sub>). The normalisation that makes the 1-D identity "inverse curvature = s/y" work for vectors.</dd>
+<dt>BFGS update</dt><dd>H<sub>k+1</sub> = (I − ρ s yᵀ) H<sub>k</sub> (I − ρ y sᵀ) + ρ s sᵀ. Rank-two change: remove what H<sub>k</sub> believed along s, insert the measured value.</dd>
+<dt>quasi-Newton</dt><dd>Any method that uses a Newton-like step with a curvature estimate built from gradient differences instead of true second derivatives (BFGS, DFP, SR1, L-BFGS).</dd>
+<dt>memory m</dt><dd>Number of recent pairs L-BFGS keeps. Typical 5–20; SciPy <code>maxcor</code> = 10 by default.</dd>
+<dt>γ<sub>k</sub></dt><dd>(s·y)/(y·y) of the newest pair; the scalar starting guess H₀ = γI. Sets the step scale, not the direction.</dd>
+<dt>two-loop recursion</dt><dd>Algorithm that computes H<sub>k</sub>∇f from the m pairs in O(mn): first loop strips gradient components along each s<sub>i</sub> (α<sub>i</sub>), scaling by γ, second loop adds back the measured steps (α<sub>i</sub> − β<sub>i</sub>) s<sub>i</sub>.</dd>
+<dt>L-BFGS-B</dt><dd>L-BFGS with simple bound constraints (SciPy's default for bounded problems). Same recursion, plus a projection onto the box.</dd>
+<dt>Gauss–Newton</dt><dd>For least-squares losses: approximate H ≈ JᵀJ with J the Jacobian of residuals. Always positive semi-definite; this is the "sensitivity matrix" of the loss-landscape notes.</dd>
+</dl>
+</div>
+</section>
+
+<script>
+(() => {
+// ================= shared =================
+const FUNCS = {
+  bowl: {label:'Ill-conditioned bowl  f = ½(x² + 25y²)', xr:[-3,3], yr:[-1.6,1.6], start:[-2.5,1.2], xl:'x', yl:'y', min:[0,0],
+    f:(x,y)=>0.5*(x*x+25*y*y), g:(x,y)=>[x,25*y], H:()=>[[1,0],[0,25]]},
+  nd: {label:'n·d valley (THz-style)  f = (n·d − 1)² + 0.05(n − 1.5)²', xr:[0.3,3], yr:[0.2,2.4], start:[2.7,2.0], xl:'n', yl:'d', min:[1.5,1/1.5],
+    f:(n,d)=>{const r=n*d-1;return r*r+0.05*(n-1.5)**2},
+    g:(n,d)=>{const r=n*d-1;return [2*r*d+0.1*(n-1.5),2*r*n]},
+    H:(n,d)=>[[2*d*d+0.1,2*(2*n*d-1)],[2*(2*n*d-1),2*n*n]]},
+  rosen:{label:'Rosenbrock  f = (1−x)² + 100(y − x²)²', xr:[-2,2], yr:[-1,3], start:[-1.5,2.2], xl:'x', yl:'y', min:[1,1],
+    f:(x,y)=>(1-x)**2+100*(y-x*x)**2,
+    g:(x,y)=>[-2*(1-x)-400*x*(y-x*x),200*(y-x*x)],
+    H:(x,y)=>[[2-400*(y-3*x*x),-400*x],[-400*x,200]]}
+};
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1], add=(a,b)=>[a[0]+b[0],a[1]+b[1]], sub=(a,b)=>[a[0]-b[0],a[1]-b[1]], sc=(a,k)=>[a[0]*k,a[1]*k], nrm=a=>Math.hypot(a[0],a[1]);
+const mv=(M,v)=>[M[0][0]*v[0]+M[0][1]*v[1],M[1][0]*v[0]+M[1][1]*v[1]];
+const inv2=M=>{const d=M[0][0]*M[1][1]-M[0][1]*M[1][0];return [[M[1][1]/d,-M[0][1]/d],[-M[1][0]/d,M[0][0]/d]]};
+const fmt=v=>{if(!isFinite(v))return'—';const a=Math.abs(v);if(a===0)return'0';if(a<1e-3||a>=1e4)return v.toExponential(2);return v.toPrecision(3)};
+const vec=v=>`(${fmt(v[0])}, ${fmt(v[1])})`;
+const mat=M=>`<span class="mat"><span>${fmt(M[0][0])}</span><span>${fmt(M[0][1])}</span><span>${fmt(M[1][0])}</span><span>${fmt(M[1][1])}</span></span>`;
+const el=id=>document.getElementById(id);
+const COL={gd:'#e07a1f',grad:'#c81e1e',lb:'#2563eb',nt:'#15803d'};
+
+function ticks(r){const span=r[1]-r[0], st=Math.pow(10,Math.floor(Math.log10(span/4))); const s=[st,2*st,5*st,10*st].find(v=>span/v<=6)||10*st; const out=[]; for(let v=Math.ceil(r[0]/s)*s; v<=r[1]+1e-9; v+=s) out.push(Math.abs(v)<1e-9?0:v); return out;}
+
+// 2-D contour plot helper
+function makePlot(canvas){
+  const W=canvas.width,H=canvas.height,PAD={l:58,r:14,t:14,b:42},ctx=canvas.getContext('2d');
+  const P={ctx,W,H,PAD,F:null,bg:null};
+  P.px=x=>PAD.l+(x-P.F.xr[0])/(P.F.xr[1]-P.F.xr[0])*(W-PAD.l-PAD.r);
+  P.py=y=>H-PAD.b-(y-P.F.yr[0])/(P.F.yr[1]-P.F.yr[0])*(H-PAD.t-PAD.b);
+  P.ux=X=>P.F.xr[0]+(X-PAD.l)/(W-PAD.l-PAD.r)*(P.F.xr[1]-P.F.xr[0]);
+  P.uy=Y=>P.F.yr[0]+(H-PAD.b-Y)/(H-PAD.t-PAD.b)*(P.F.yr[1]-P.F.yr[0]);
+  P.setF=F=>{P.F=F;P.bg=null;};
+  function buildBg(){
+    const F=P.F, NX=200, NY=160, vals=new Float64Array((NX+1)*(NY+1)); let hi=-Infinity;
+    for(let j=0;j<=NY;j++)for(let i=0;i<=NX;i++){const v=F.f(F.xr[0]+i/NX*(F.xr[1]-F.xr[0]),F.yr[0]+j/NY*(F.yr[1]-F.yr[0]));vals[j*(NX+1)+i]=v;if(v>hi)hi=v;}
+    const fmin=F.f(...F.min), del=Math.max((hi-fmin)*1e-4,1e-12), L=v=>Math.log10(v-fmin+del), Llo=L(fmin), Lhi=L(hi);
+    const off=document.createElement('canvas'); off.width=W; off.height=H; const oc=off.getContext('2d');
+    const img=oc.createImageData(W,H), d=img.data, c0=[247,247,245], c1=[71,85,105];
+    for(let Y=0;Y<H;Y++)for(let X=0;X<W;X++){const o=(Y*W+X)*4;
+      if(X<PAD.l||X>=W-PAD.r||Y<PAD.t||Y>=H-PAD.b){d[o]=d[o+1]=d[o+2]=255;d[o+3]=255;continue;}
+      const t=Math.min(1,Math.max(0,(L(F.f(P.ux(X),P.uy(Y)))-Llo)/(Lhi-Llo))), u=Math.pow(t,0.7);
+      d[o]=c0[0]+(c1[0]-c0[0])*u; d[o+1]=c0[1]+(c1[1]-c0[1])*u; d[o+2]=c0[2]+(c1[2]-c0[2])*u; d[o+3]=255;}
+    oc.putImageData(img,0,0);
+    const NL=16, SEG={1:[[3,2]],2:[[2,1]],3:[[3,1]],4:[[1,0]],5:[[3,0],[1,2]],6:[[2,0]],7:[[3,0]],8:[[3,0]],9:[[2,0]],10:[[3,2],[1,0]],11:[[1,0]],12:[[3,1]],13:[[2,1]],14:[[3,2]]};
+    oc.strokeStyle='rgba(30,41,59,0.28)'; oc.lineWidth=1; oc.beginPath();
+    const gx=i=>P.px(F.xr[0]+i/NX*(F.xr[1]-F.xr[0])), gy=j=>P.py(F.yr[0]+j/NY*(F.yr[1]-F.yr[0]));
+    for(let l=1;l<NL;l++){const lev=fmin-del+Math.pow(10,Llo+(Lhi-Llo)*l/NL);
+      for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+        const v=[vals[j*(NX+1)+i],vals[j*(NX+1)+i+1],vals[(j+1)*(NX+1)+i+1],vals[(j+1)*(NX+1)+i]];
+        const idx=(v[0]>lev?8:0)|(v[1]>lev?4:0)|(v[2]>lev?2:0)|(v[3]>lev?1:0); if(!SEG[idx]) continue;
+        const Q=[[gx(i),gy(j)],[gx(i+1),gy(j)],[gx(i+1),gy(j+1)],[gx(i),gy(j+1)]];
+        const E=e=>{const a=e,b=(e+1)%4,t=(lev-v[a])/(v[b]-v[a]);return [Q[a][0]+t*(Q[b][0]-Q[a][0]),Q[a][1]+t*(Q[b][1]-Q[a][1])];};
+        for(const [e1,e2] of SEG[idx]){const A=E(e1),B=E(e2);oc.moveTo(A[0],A[1]);oc.lineTo(B[0],B[1]);}}}
+    oc.stroke();
+    oc.fillStyle='#4b5563'; oc.font='22px system-ui'; oc.textAlign='center'; oc.fillText(F.xl,(PAD.l+W-PAD.r)/2,H-10);
+    oc.save(); oc.translate(18,(PAD.t+H-PAD.b)/2); oc.rotate(-Math.PI/2); oc.fillText(F.yl,0,0); oc.restore();
+    oc.font='17px system-ui'; oc.fillStyle='#6b7280';
+    oc.textAlign='center'; for(const x of ticks(F.xr)) oc.fillText(fmt(x),P.px(x),H-PAD.b+20);
+    oc.textAlign='right'; for(const y of ticks(F.yr)) oc.fillText(fmt(y),PAD.l-6,P.py(y)+6);
+    P.bg=off;
+  }
+  P.begin=()=>{if(!P.bg)buildBg(); ctx.clearRect(0,0,W,H); ctx.drawImage(P.bg,0,0); ctx.save(); ctx.beginPath(); ctx.rect(PAD.l,PAD.t,W-PAD.l-PAD.r,H-PAD.t-PAD.b); ctx.clip();
+    const mx=P.px(P.F.min[0]),my=P.py(P.F.min[1]); ctx.fillStyle='#111'; ctx.font='26px system-ui'; ctx.textAlign='center'; ctx.fillText('★',mx,my+9);};
+  P.end=()=>ctx.restore();
+  P.path=(pts,col,w)=>{if(pts.length<2)return; ctx.strokeStyle=col;ctx.lineWidth=w;ctx.lineJoin='round';ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(P.px(p[0]),P.py(p[1])):ctx.moveTo(P.px(p[0]),P.py(p[1])));ctx.stroke();};
+  P.dot=(p,col,r,stroke)=>{ctx.beginPath();ctx.arc(P.px(p[0]),P.py(p[1]),r,0,7); if(stroke){ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=3;ctx.stroke();} else {ctx.fillStyle=col;ctx.fill();}};
+  P.dirArrow=(p,v,len,col,w,label)=>{ // direction v in data units, fixed pixel length
+    const dx=v[0]/(P.F.xr[1]-P.F.xr[0])*(W-PAD.l-PAD.r), dy=-v[1]/(P.F.yr[1]-P.F.yr[0])*(H-PAD.t-PAD.b); const n=Math.hypot(dx,dy)||1;
+    const X=P.px(p[0]),Y=P.py(p[1]),x1=X+dx/n*len,y1=Y+dy/n*len; arrow(ctx,X,Y,x1,y1,col,w);
+    if(label){ctx.font='bold 18px system-ui';ctx.textAlign='left';ctx.fillStyle=col;ctx.fillText(label,x1+dx/n*10+4,y1+dy/n*10+6);}};
+  P.vecArrow=(p,v,col,w)=>{arrow(ctx,P.px(p[0]),P.py(p[1]),P.px(p[0]+v[0]),P.py(p[1]+v[1]),col,w);};
+  P.label=(p,txt,col,dx,dy)=>{ctx.font='bold 17px system-ui';ctx.textAlign='center';ctx.fillStyle=col;ctx.fillText(txt,P.px(p[0])+(dx||0),P.py(p[1])+(dy||0));};
+  P.onClick=cb=>canvas.addEventListener('click',e=>{const r=canvas.getBoundingClientRect(); const X=(e.clientX-r.left)*W/r.width, Y=(e.clientY-r.top)*H/r.height; if(X<PAD.l||X>W-PAD.r||Y<PAD.t||Y>H-PAD.b) return; cb([P.ux(X),P.uy(Y)]);});
+  return P;
+}
+function arrow(c,x0,y0,x1,y1,col,w){
+  c.strokeStyle=col;c.fillStyle=col;c.lineWidth=w;c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.stroke();
+  const a=Math.atan2(y1-y0,x1-x0),h=8+w*1.5;c.beginPath();c.moveTo(x1,y1);c.lineTo(x1-h*Math.cos(a-0.4),y1-h*Math.sin(a-0.4));c.lineTo(x1-h*Math.cos(a+0.4),y1-h*Math.sin(a+0.4));c.closePath();c.fill();
+}
+function eig2(M){ const a=M[0][0],b=(M[0][1]+M[1][0])/2,c=M[1][1]; const tr=a+c, det=a*c-b*b, dsc=Math.sqrt(Math.max(0,tr*tr/4-det)); const l1=tr/2+dsc,l2=tr/2-dsc; let v1=Math.abs(b)>1e-12?[l1-c,b]:(a>=c?[1,0]:[0,1]); const n=Math.hypot(v1[0],v1[1]); v1=[v1[0]/n,v1[1]/n]; return {l1,l2,v1,v2:[-v1[1],v1[0]]}; }
+function ellipse(c,M,cx,cy,R,col,dash,fill){
+  const e=eig2(M); if(!(e.l1>0&&e.l2>0)) return false;
+  const s=R/e.l1; c.save(); c.translate(cx,cy); c.rotate(-Math.atan2(e.v1[1],e.v1[0])); c.beginPath(); c.ellipse(0,0,e.l1*s,e.l2*s,0,0,7);
+  if(fill){c.fillStyle=fill;c.fill();} c.setLineDash(dash||[]); c.strokeStyle=col; c.lineWidth=3; c.stroke(); c.restore(); return true;
+}
+function drawInset(canvas,F,x,Hest,labels){
+  const c=canvas.getContext('2d'), w=canvas.width, cx=w/2, cy=w/2, R=w*0.42; c.clearRect(0,0,w,w);
+  c.strokeStyle='#e3e4e8'; c.lineWidth=1; c.beginPath(); c.moveTo(cx,0); c.lineTo(cx,w); c.moveTo(0,cy); c.lineTo(w,cy); c.stroke();
+  ellipse(c,[[1,0],[0,1]],cx,cy,R*0.6,'#9aa0a8',[6,6]);
+  const Ht=F.H(...x), det=Ht[0][0]*Ht[1][1]-Ht[0][1]*Ht[1][0]; let ok=false;
+  if(det>0&&Ht[0][0]>0) ok=ellipse(c,inv2(Ht),cx,cy,R,COL.nt,[2,5]);
+  if(Hest) ellipse(c,Hest,cx,cy,R*0.92,COL.lb,[],'rgba(37,99,235,0.10)');
+  c.fillStyle='#6b7280'; c.font='21px system-ui'; c.textAlign='left';
+  if(!ok) c.fillText('true H not positive definite here',8,w-12);
+  c.textAlign='right'; c.fillText(F.xl,w-8,cy-6); c.textAlign='left'; c.fillText(F.yl,cx+6,20);
+}
+function armijo(F,x,f0,g,p,a){
+  const gp=dot(g,p); if(!(gp<0)) return null;
+  for(let t=1;t<=50;t++){ const xn=add(x,sc(p,a)); const fn=F.f(...xn);
+    if(isFinite(fn)&&fn<=f0+1e-4*a*gp) return {alpha:a,tries:t,fn,xn}; a*=0.5; }
+  return null;
+}
+function fillSelect(sel,cb){for(const k in FUNCS){const o=document.createElement('option');o.value=k;o.textContent=FUNCS[k].label;sel.appendChild(o);} sel.onchange=()=>cb(FUNCS[sel.value]);}
+function runner(stepFn,btn,isDone){let timer=null; const stop=()=>{if(timer){clearInterval(timer);timer=null;}btn.textContent='Run';};
+  btn.onclick=()=>{if(timer){stop();return;} if(isDone()) return; btn.textContent='Pause'; timer=setInterval(()=>{stepFn(); if(isDone()) stop();},320);}; return stop;}
+
+// 1-D plot helper
+const f1={f:x=>x**4-2*x*x+0.5*x, d1:x=>4*x**3-4*x+0.5, d2:x=>12*x*x-4, xr:[-1.8,1.8], yr:[-1.6,3.2]};
+function make1D(canvas){
+  const W=canvas.width,H=canvas.height,PAD={l:50,r:14,t:14,b:38},ctx=canvas.getContext('2d');
+  const px=x=>PAD.l+(x-f1.xr[0])/(f1.xr[1]-f1.xr[0])*(W-PAD.l-PAD.r), py=y=>H-PAD.b-(y-f1.yr[0])/(f1.yr[1]-f1.yr[0])*(H-PAD.t-PAD.b);
+  const curve=(fn,col,w,dash)=>{ctx.save();ctx.setLineDash(dash||[]);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();let first=true;for(let i=0;i<=400;i++){const x=f1.xr[0]+i/400*(f1.xr[1]-f1.xr[0]);const y=fn(x);if(!isFinite(y)||y>f1.yr[1]+2||y<f1.yr[0]-2){first=true;continue;}const X=px(x),Y=py(y);first?ctx.moveTo(X,Y):ctx.lineTo(X,Y);first=false;}ctx.stroke();ctx.restore();};
+  return {ctx,W,H,px,py,curve,
+    begin(){ctx.clearRect(0,0,W,H); ctx.strokeStyle='#e3e4e8'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(px(f1.xr[0]),py(0)); ctx.lineTo(px(f1.xr[1]),py(0)); ctx.stroke();
+      ctx.fillStyle='#6b7280'; ctx.font='16px system-ui'; ctx.textAlign='center'; for(const x of [-1.5,-1,-0.5,0,0.5,1,1.5]) ctx.fillText(x,px(x),H-PAD.b+20);
+      ctx.textAlign='right'; for(const y of [-1,0,1,2,3]) ctx.fillText(y,PAD.l-6,py(y)+6);
+      ctx.save(); ctx.beginPath(); ctx.rect(PAD.l,PAD.t,W-PAD.l-PAD.r,H-PAD.t-PAD.b); ctx.clip(); curve(f1.f,'#1f2329',3);},
+    end(){ctx.restore();},
+    dot(x,y,col,r){ctx.fillStyle=col;ctx.beginPath();ctx.arc(px(x),py(y),r||8,0,7);ctx.fill();},
+    text(x,y,t,col,dx,dy){ctx.fillStyle=col;ctx.font='bold 17px system-ui';ctx.textAlign='center';ctx.fillText(t,px(x)+(dx||0),py(y)+(dy||0));}};
+}
+
+// ================= tabs =================
+const tabs=[...document.querySelectorAll('section.tab')], navBtns=[...document.querySelectorAll('nav button')];
+const redraw={};
+function showTab(id){tabs.forEach(s=>s.classList.toggle('on',s.id===id)); navBtns.forEach(b=>b.classList.toggle('on',b.dataset.t===id)); if(redraw[id]) redraw[id](); window.scrollTo({top:0});}
+navBtns.forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+document.querySelectorAll('.next button').forEach(b=>b.onclick=()=>showTab(b.dataset.go));
+
+// ================= TAB 1: gradient descent =================
+(()=>{
+  const F=FUNCS.bowl, P=makePlot(el('t1c')); P.setF(F); let st; let alpha=0.04;
+  const reset=start=>{stop(); st={x:[...(start||F.start)],path:[[...(start||F.start)]],k:0,last:null,div:false,done:false}; draw();};
+  const step=()=>{ if(st.done||st.div) return; const g=F.g(...st.x), f0=F.f(...st.x); let a=alpha, tries=1;
+    if(el('t1ls').checked){const ls=armijo(F,st.x,f0,g,sc(g,-1),0.2); if(!ls){st.div=true;return;} a=ls.alpha; tries=ls.tries;}
+    const xn=sub(st.x,sc(g,a)); st.last={g,a,tries,f0,fn:F.f(...xn),x0:st.x,xn}; st.x=xn; st.path.push(xn); st.k++;
+    if(!isFinite(F.f(...xn))||nrm(xn)>50) st.div=true; if(nrm(F.g(...xn))<1e-6||st.k>=2000) st.done=true; };
+  const stop=runner(()=>{step();draw();},el('t1run'),()=>st.done||st.div);
+  function draw(){
+    P.begin(); P.path(st.path,COL.gd,2.5); for(const p of st.path) P.dot(p,COL.gd,3.5);
+    const g=F.g(...st.x); if(!st.done&&!st.div) P.dirArrow(st.x,sc(g,-1),90,COL.grad,3,'−∇f');
+    P.dot(st.x,COL.gd,8,true); P.end();
+    const f=F.f(...st.x);
+    el('t1stats').innerHTML=`<span>iteration k</span><b>${st.k}</b><span>x<sub>k</sub></span><b>${vec(st.x)}</b><span>f(x<sub>k</sub>)</span><b>${fmt(f)}</b><span>∇f(x<sub>k</sub>)</span><b>${vec(g)}</b><span>|∇f|</span><b>${fmt(nrm(g))}</b>`;
+    const L=st.last;
+    el('t1trace').innerHTML=L?`<span class="l">∇f(x<sub>${st.k-1}</sub>) = ${vec(L.g)}</span><span class="l l1">α = ${fmt(L.a)}${el('t1ls').checked?` (line search, ${L.tries} trial${L.tries>1?'s':''})`:''}, so −α∇f = ${vec(sc(L.g,-L.a))}</span><span class="l l2">x<sub>${st.k}</sub> = ${vec(L.x0)} + ${vec(sc(L.g,-L.a))} = <b>${vec(L.xn)}</b></span><span class="l ls">f: ${fmt(L.f0)} → ${fmt(L.fn)} ${L.fn<L.f0?'<span class="tag ok">down</span>':'<span class="tag bad">up!</span>'}</span>`:'<span class="small">press Step</span>';
+    let n;
+    if(st.div) n='Diverged. With α above 2/25 = 0.08 every step in y overshoots the valley floor and lands higher on the other side; the y component grows without bound while x is still happily converging. That is the stability limit set by the steepest curvature.';
+    else if(st.done) n=`Converged after ${st.k} iterations. The x component (curvature 1) was the slow one: it shrinks only by a factor (1 − α) per step.`;
+    else if(el('t1ls').checked) n='With a line search each step goes as far as it can along −∇f, and stops where the direction is tangent to a contour. The next gradient is perpendicular to that contour, hence perpendicular to the previous step: a right-angled zig-zag. Still ~κ = 25 steps across the valley to make progress along it.';
+    else n=`Fixed step size α = ${alpha}. The y component is multiplied by (1 − 25α) = ${(1-25*alpha).toFixed(2)} each step, the x component by (1 − α) = ${(1-alpha).toFixed(3)}. ${alpha>0.04?'The y factor is negative: the iterate jumps across the valley every step.':'y converges fast, x crawls.'} No single α suits both directions — the problem is that the gradient does not know the curvature.`;
+    el('t1note').innerHTML=n;
+  }
+  el('t1a').oninput=e=>{alpha=+e.target.value; el('t1av').textContent=alpha; draw();};
+  el('t1ls').onchange=draw; el('t1step').onclick=()=>{step();draw();}; el('t1reset').onclick=()=>reset();
+  P.onClick(p=>reset(p)); redraw.t1=draw; reset();
+})();
+
+// ================= TAB 2: Newton =================
+(()=>{
+  // 1-D
+  const Q=make1D(el('t2c1'));
+  function draw1(){
+    const x0=+el('t2x').value, f0=f1.f(x0), d1=f1.d1(x0), d2=f1.d2(x0); el('t2xv').textContent=x0.toFixed(2);
+    const xN=x0-d1/d2, xG=x0-0.05*d1;
+    Q.begin(); Q.curve(x=>f0+d1*(x-x0),COL.grad,2); Q.curve(x=>f0+d1*(x-x0)+0.5*d2*(x-x0)**2,COL.nt,2.5,[7,5]);
+    Q.dot(xG,f1.f(xG),COL.gd,7); Q.dot(xN,f1.f(xN),COL.nt,8); Q.dot(x0,f0,'#1f2329',8);
+    Q.text(x0,f0,'x₀','#1f2329',0,-16); Q.text(xN,f1.f(xN),'Newton',COL.nt,0,30); Q.text(xG,f1.f(xG),'GD',COL.gd,0,-14); Q.end();
+    el('t2stats').innerHTML=`<span>f(x₀)</span><b>${fmt(f0)}</b><span>slope f′(x₀)</span><b>${fmt(d1)}</b><span>curvature f″(x₀)</span><b>${fmt(d2)}</b><span>Newton step −f′/f″</span><b>${fmt(-d1/d2)}</b><span>Newton target</span><b>${fmt(xN)}</b><span>GD step −0.05 f′</span><b>${fmt(-0.05*d1)}</b>`;
+    el('t2note').innerHTML=d2<=0?`Curvature is <b>negative</b> here (f″ = ${fmt(d2)}): the Taylor model is an upside-down parabola and its stationary point is a <i>maximum</i>. Newton's step walks to the top of the hump. This is why Newton-type methods need the Hessian to be positive definite, and why quasi-Newton methods insist on the curvature condition s·y &gt; 0.`:
+      Math.abs(xN-x0)<0.3?`Close to a well, the parabola fits the function well and the Newton target (green) is almost exactly at the bottom; the gradient step (orange) with α = 0.05 moves only ${fmt(Math.abs(0.05*d1))}. Newton's step is ${fmt(Math.abs(d1/d2)/Math.abs(0.05*d1))}× longer because it divides by the curvature instead of multiplying by an arbitrary α.`:
+      `Far from the minimum the parabola is a rough model: the Newton target (green) is ${fmt(Math.abs(xN-x0))} away and may overshoot the well. A line search starting at α = 1 and backtracking is the usual safety net.`;
+  }
+  el('t2x').oninput=draw1;
+  // 2-D
+  let F=FUNCS.bowl; const P=makePlot(el('t2c2')); P.setF(F); let st;
+  const reset=start=>{st={x:[...(start||F.start)],path:[[...(start||F.start)]],k:0,fail:false}; draw2();};
+  function newton(){ const g=F.g(...st.x), Ht=F.H(...st.x), det=Ht[0][0]*Ht[1][1]-Ht[0][1]*Ht[1][0]; const p=sc(mv(inv2(Ht),g),-1);
+    const ls=armijo(F,st.x,F.f(...st.x),g,p,1); if(!ls){st.fail=true;return;} st.x=ls.xn; st.path.push(ls.xn); st.k++; st.lastAlpha=ls.alpha; }
+  function draw2(){
+    const g=F.g(...st.x), Ht=F.H(...st.x), det=Ht[0][0]*Ht[1][1]-Ht[0][1]*Ht[1][0], pd=det>0&&Ht[0][0]>0; const Hi=inv2(Ht), p=sc(mv(Hi,g),-1);
+    P.begin(); P.path(st.path,COL.nt,2.5); for(const q of st.path) P.dot(q,COL.nt,3.5);
+    if(nrm(g)>1e-7){P.dirArrow(st.x,sc(g,-1),90,COL.grad,3,'−∇f'); P.dirArrow(st.x,p,120,COL.nt,5,'p');}
+    P.dot(st.x,COL.nt,8,true); P.end();
+    drawInset(el('t2ins'),F,st.x,null);
+    const e=eig2(Ht);
+    el('t2stats2').innerHTML=`<span>iteration</span><b>${st.k}</b><span>x</span><b>${vec(st.x)}</b><span>f</span><b>${fmt(F.f(...st.x))}</b><span>|∇f|</span><b>${fmt(nrm(g))}</b><span>condition number</span><b>${e.l2>0?fmt(e.l1/e.l2):'not PD'}</b>${st.lastAlpha!==undefined?`<span>last α accepted</span><b>${fmt(st.lastAlpha)}</b>`:''}`;
+    el('t2mats').innerHTML=`∇f = ${vec(g)}<br>H = ${mat(Ht)} &nbsp; eigenvalues (curvatures) ${fmt(e.l1)}, ${fmt(e.l2)} ${pd?'<span class="tag ok">positive definite</span>':'<span class="tag bad">not positive definite</span>'}<br>H⁻¹ = ${mat(Hi)}<br>p = −H⁻¹∇f = <b>${vec(p)}</b>${st.fail?'<br><span class="tag bad">not a descent direction — line search failed</span>':''}`;
+  }
+  fillSelect(el('t2sel'),f=>{F=f;P.setF(F);reset();});
+  el('t2step').onclick=()=>{if(!st.fail){newton();draw2();}}; el('t2reset').onclick=()=>reset(); P.onClick(p=>reset(p));
+  redraw.t2=()=>{draw1();draw2();}; draw1(); reset();
+})();
+
+// ================= TAB 3: secant + BFGS =================
+(()=>{
+  const Q=make1D(el('t3c1'));
+  function draw1(){
+    const x0=+el('t3x0').value, x1=+el('t3x1').value; el('t3x0v').textContent=x0.toFixed(2); el('t3x1v').textContent=x1.toFixed(2);
+    const s=x1-x0, y=f1.d1(x1)-f1.d1(x0), cs=y/s, ct=f1.d2(x1), f1v=f1.f(x1), d1=f1.d1(x1);
+    const xS=x1-d1/cs, xN=x1-d1/ct;
+    Q.begin(); Q.curve(x=>f1.f(x0)+f1.d1(x0)*(x-x0),COL.grad,1.5); Q.curve(x=>f1v+d1*(x-x1),COL.grad,2);
+    if(isFinite(cs)) Q.curve(x=>f1v+d1*(x-x1)+0.5*cs*(x-x1)**2,COL.lb,2.5,[7,5]);
+    Q.dot(xN,f1.f(xN),COL.nt,7); if(isFinite(xS)) {Q.dot(xS,f1.f(xS),COL.lb,8); Q.text(xS,f1.f(xS),'secant',COL.lb,0,-14);}
+    Q.dot(x0,f1.f(x0),'#9aa0a8',7); Q.dot(x1,f1v,'#1f2329',8); Q.text(x0,f1.f(x0),'x₀','#6b7280',0,-14); Q.text(x1,f1v,'x₁','#1f2329',0,-14); Q.text(xN,f1.f(xN),'Newton',COL.nt,0,30); Q.end();
+    el('t3stats').innerHTML=`<span>s = x₁ − x₀</span><b>${fmt(s)}</b><span>f′(x₀), f′(x₁)</span><b>${fmt(f1.d1(x0))}, ${fmt(d1)}</b><span>y = f′(x₁) − f′(x₀)</span><b>${fmt(y)}</b><span>secant curvature y/s</span><b>${fmt(cs)}</b><span>true f″(x₁)</span><b>${fmt(ct)}</b><span>inverse curvature s/y</span><b>${fmt(s/y)}</b><span>secant step −(s/y) f′(x₁)</span><b>${fmt(-d1*s/y)}</b><span>true Newton step</span><b>${fmt(-d1/ct)}</b>`;
+    el('t3note').innerHTML=Math.abs(s)<1e-9?'Move x₀ away from x₁ — with s = 0 there is nothing to measure.':
+      cs<=0?`y/s = ${fmt(cs)} ≤ 0: the <b>curvature condition fails</b>. Between x₀ and x₁ the slope got <i>less</i> steep in the direction of travel — the segment crosses the hump — and the secant estimate says "concave". A BFGS code must reject this pair; a Wolfe line search would not have produced it.`:
+      `The secant estimate y/s = ${fmt(cs)} vs the true curvature ${fmt(ct)} (${fmt(100*Math.abs(cs/ct-1))} % off). It was obtained from two gradients we had anyway, no second derivative needed. The secant step lands at ${fmt(xS)}, Newton at ${fmt(xN)}. Bring x₀ closer to x₁ and the two agree ever better; this is the whole quasi-Newton idea in one dimension.`;
+  }
+  el('t3x0').oninput=draw1; el('t3x1').oninput=draw1;
+  // 2-D BFGS
+  let F=FUNCS.bowl; const P=makePlot(el('t3c2')); P.setF(F); let st;
+  const reset=start=>{stop(); st={x:[...(start||F.start)],path:[[...(start||F.start)]],k:0,Hk:null,last:null,done:false,fail:false}; draw2();};
+  function curH(){ if(st.Hk) return st.Hk; const g=F.g(...st.x), s=1/Math.max(nrm(g),1e-12); return [[s,0],[0,s]]; }
+  function step(){ if(st.done||st.fail) return; const g=F.g(...st.x), f0=F.f(...st.x), H0=curH(), p=sc(mv(H0,g),-1);
+    const ls=armijo(F,st.x,f0,g,p,1); if(!ls){st.fail=true;return;}
+    const gn=F.g(...ls.xn), s=sub(ls.xn,st.x), y=sub(gn,g), sy=dot(s,y);
+    let Hb=H0; if(!st.Hk&&sy>0){const gam=sy/dot(y,y); Hb=[[gam,0],[0,gam]];} // first update: rescale H0 by γ (Nocedal–Wright 6.20)
+    let Hn=Hb, accepted=sy>1e-14, parts=null;
+    if(accepted){ const rho=1/sy; const A=[[1-rho*s[0]*y[0],-rho*s[0]*y[1]],[-rho*s[1]*y[0],1-rho*s[1]*y[1]]]; // I − ρ s yᵀ
+      const AH=[[A[0][0]*Hb[0][0]+A[0][1]*Hb[1][0],A[0][0]*Hb[0][1]+A[0][1]*Hb[1][1]],[A[1][0]*Hb[0][0]+A[1][1]*Hb[1][0],A[1][0]*Hb[0][1]+A[1][1]*Hb[1][1]]];
+      const AT=[[A[0][0],A[1][0]],[A[0][1],A[1][1]]];
+      const AHA=[[AH[0][0]*AT[0][0]+AH[0][1]*AT[1][0],AH[0][0]*AT[0][1]+AH[0][1]*AT[1][1]],[AH[1][0]*AT[0][0]+AH[1][1]*AT[1][0],AH[1][0]*AT[0][1]+AH[1][1]*AT[1][1]]];
+      const SS=[[rho*s[0]*s[0],rho*s[0]*s[1]],[rho*s[1]*s[0],rho*s[1]*s[1]]];
+      Hn=[[AHA[0][0]+SS[0][0],AHA[0][1]+SS[0][1]],[AHA[1][0]+SS[1][0],AHA[1][1]+SS[1][1]]]; parts={rho,A,AHA,SS,Hb}; st.Hk=Hn; }
+    st.last={s,y,sy,accepted,parts,Hn,alpha:ls.alpha,tries:ls.tries,f0,fn:ls.fn}; st.x=ls.xn; st.path.push(ls.xn); st.k++;
+    if(nrm(gn)<1e-7||st.k>=300) st.done=true; }
+  const stop=runner(()=>{step();draw2();},el('t3run'),()=>st.done||st.fail);
+  function draw2(){
+    const g=F.g(...st.x), Hk=curH(), p=sc(mv(Hk,g),-1);
+    P.begin(); P.path(st.path,'rgba(37,99,235,0.55)',2.5); if(st.path.length>1) P.path(st.path.slice(-2),COL.lb,6); for(const q of st.path) P.dot(q,COL.lb,3.5);
+    if(st.path.length>1){const a=st.path[st.path.length-2],b=st.path[st.path.length-1]; P.label([(a[0]+b[0])/2,(a[1]+b[1])/2],'s',COL.lb,12,-10);}
+    if(!st.done){P.dirArrow(st.x,sc(g,-1),90,COL.grad,3,'−∇f'); P.dirArrow(st.x,p,120,COL.lb,5,'p');}
+    P.dot(st.x,COL.lb,8,true); P.end();
+    drawInset(el('t3ins'),F,st.x,Hk);
+    const Ht=F.H(...st.x), det=Ht[0][0]*Ht[1][1]-Ht[0][1]*Ht[1][0];
+    el('t3stats2').innerHTML=`<span>iteration k</span><b>${st.k}</b><span>x<sub>k</sub></span><b>${vec(st.x)}</b><span>f</span><b>${fmt(F.f(...st.x))}</b><span>|∇f|</span><b>${fmt(nrm(g))}</b><span>H<sub>k</sub> (estimate of H⁻¹)</span><b>${mat(Hk)}</b><span>true H⁻¹ here</span><b>${det>0?mat(inv2(Ht)):'not PD'}</b><span>p = −H<sub>k</sub>∇f</span><b>${vec(p)}</b>${st.done?'<span></span><b><span class="tag ok">converged</span></b>':''}${st.fail?'<span></span><b><span class="tag bad">line search failed</span></b>':''}`;
+    const L=st.last;
+    el('t3upd').innerHTML=!L?`No pair yet. Without curvature information H₀ = I/|∇f|: the first step is a unit step of steepest descent.`:
+      !L.accepted?`New pair s = ${vec(L.s)}, y = ${vec(L.y)}: s·y = ${fmt(L.sy)} ≤ 0 <span class="tag bad">rejected</span> — curvature condition failed, H<sub>k</sub> left unchanged.`:
+      `<div class="trace"><span class="l">pair: s = ${vec(L.s)}, y = ${vec(L.y)}, s·y = ${fmt(L.sy)} <span class="tag ok">s·y &gt; 0</span>, ρ = 1/(s·y) = ${fmt(L.parts.rho)}</span>
+       <span class="l">${st.k===1?'first pair → H₀ rescaled to γI with γ = s·y/y·y = '+fmt(L.parts.Hb[0][0]):'H<sub>k−1</sub> = '+mat(L.parts.Hb)}</span>
+       <span class="l l1">(I − ρ s yᵀ) = ${mat(L.parts.A)} &nbsp;← "remove what was believed along s"</span>
+       <span class="l l1">(I − ρ s yᵀ) H<sub>k−1</sub> (I − ρ y sᵀ) = ${mat(L.parts.AHA)}</span>
+       <span class="l l2">+ ρ s sᵀ = ${mat(L.parts.SS)} &nbsp;← "insert the measured inverse curvature along s"</span>
+       <span class="l ls">= H<sub>k</sub> = ${mat(L.Hn)} &nbsp; check: H<sub>k</sub> y = ${vec(mv(L.Hn,L.y))} = s ✓</span>
+       <span class="l">line search: α = ${fmt(L.alpha)} after ${L.tries} trial${L.tries>1?'s':''}, f ${fmt(L.f0)} → ${fmt(L.fn)}</span></div>`;
+  }
+  fillSelect(el('t3sel'),f=>{F=f;P.setF(F);reset();});
+  el('t3step').onclick=()=>{step();draw2();}; el('t3reset').onclick=()=>reset(); P.onClick(p=>reset(p));
+  redraw.t3=()=>{draw1();draw2();}; draw1(); reset();
+})();
+
+// ================= TAB 5: L-BFGS playground =================
+(()=>{
+  let F=FUNCS.bowl, m=3, S; const P=makePlot(el('plot')); P.setF(F);
+  function reset(start){ stop(); const x=[...(start||F.start)]; const g=F.g(...x);
+    S={k:0,x,S:[],Y:[],path:[x],last:null,done:false,fail:false, gd:{k:0,x:[...x],path:[x],alpha:1/Math.max(nrm(g),1e-12),done:false,fail:false}}; draw(); }
+  function twoLoop(q0,Ss,Ys,gamma,trace){
+    let q=[...q0]; const n=Ss.length, a=[],rho=[],b=[];
+    for(let i=n-1;i>=0;i--){rho[i]=1/dot(Ys[i],Ss[i]); a[i]=rho[i]*dot(Ss[i],q); q=sub(q,sc(Ys[i],a[i])); if(trace) trace.push({loop:1,i,rho:rho[i],a:a[i],q:[...q]});}
+    let r=sc(q,gamma); if(trace) trace.push({loop:0,r:[...r]});
+    for(let i=0;i<n;i++){b[i]=rho[i]*dot(Ys[i],r); r=add(r,sc(Ss[i],a[i]-b[i])); if(trace) trace.push({loop:2,i,b:b[i],a:a[i],r:[...r]});}
+    return r;
+  }
+  function gammaOf(st,g){ const n=st.S.length; if(n===0) return 1/Math.max(nrm(g),1e-12); return dot(st.S[n-1],st.Y[n-1])/dot(st.Y[n-1],st.Y[n-1]); }
+  function preview(){ const x=S.x, g=F.g(...x), f0=F.f(...x), gamma=gammaOf(S,g), tr=[]; const r=twoLoop(g,S.S,S.Y,gamma,tr), p=sc(r,-1);
+    const c1=twoLoop([1,0],S.S,S.Y,gamma), c2=twoLoop([0,1],S.S,S.Y,gamma); return {x,g,f0,gamma,tr,p,Hk:[[c1[0],c2[0]],[c1[1],c2[1]]]}; }
+  function lbfgsStep(){ if(S.done||S.fail) return; const pv=preview(); const ls=armijo(F,pv.x,pv.f0,pv.g,pv.p,1);
+    if(!ls){S.fail=true;S.last={fail:true};return;}
+    const gn=F.g(...ls.xn), s=sub(ls.xn,pv.x), y=sub(gn,pv.g), sy=dot(s,y), accepted=sy>1e-14;
+    if(accepted){S.S.push(s);S.Y.push(y); if(S.S.length>m){S.S.shift();S.Y.shift();}}
+    S.last={alpha:ls.alpha,tries:ls.tries,f0:pv.f0,fn:ls.fn,s,y,sy,accepted}; S.x=ls.xn; S.k++; S.path.push(ls.xn);
+    if(nrm(gn)<1e-7||S.k>=500) S.done=true; }
+  function gdStep(){ const G=S.gd; if(G.done||G.fail) return; const g=F.g(...G.x), f0=F.f(...G.x); const ls=armijo(F,G.x,f0,g,sc(g,-1),2*G.alpha);
+    if(!ls){G.fail=true;return;} G.alpha=ls.alpha; G.x=ls.xn; G.k++; G.path.push(ls.xn); if(nrm(F.g(...G.x))<1e-7||G.k>=5000) G.done=true; }
+  const step=()=>{lbfgsStep();gdStep();draw();};
+  const stop=runner(step,el('run'),()=>S.done||S.fail);
+  function draw(){
+    P.begin();
+    if(el('showgd').checked){P.path(S.gd.path,COL.gd,2.5); P.dot(S.gd.x,COL.gd,6);}
+    P.path(S.path,'rgba(37,99,235,0.55)',2.5);
+    const nmem=S.S.length, start=S.path.length-1-nmem;
+    for(let i=0;i<nmem;i++){const a=S.path[start+i],b=S.path[start+i+1]; P.path([a,b],COL.lb,6); P.label([(a[0]+b[0])/2,(a[1]+b[1])/2],'s'+(S.k-nmem+i),'#1d4ed8',12,-10);}
+    for(const p of S.path) P.dot(p,COL.lb,4);
+    const pv=preview();
+    if(!S.done){P.dirArrow(pv.x,sc(pv.g,-1),95,COL.grad,3,'−∇f'); P.dirArrow(pv.x,pv.p,120,COL.lb,5,'p');}
+    P.dot(pv.x,COL.lb,8,true); P.end();
+    drawInset(el('inset'),F,pv.x,pv.Hk); updatePanel(pv);
+  }
+  function updatePanel(pv){
+    const G=S.gd, gdOn=el('showgd').checked, n=S.S.length;
+    el('stats').innerHTML=`<span>iteration k</span><b>${S.k}</b><span>x<sub>k</sub></span><b>${vec(pv.x)}</b><span>f(x<sub>k</sub>)</span><b>${fmt(pv.f0)}</b><span>∇f(x<sub>k</sub>)</span><b>${vec(pv.g)}</b>`+
+      (gdOn?`<span style="color:var(--gd)">gradient descent</span><b style="color:var(--gd)">k = ${G.k}, f = ${fmt(F.f(...G.x))}${G.done?' ✓':''}</b>`:'');
+    let t=`<tr><th>pair</th><th>s<sub>i</sub> = Δx</th><th>y<sub>i</sub> = Δ∇f</th><th>s·y</th><th>ρ<sub>i</sub></th></tr>`;
+    if(!n) t+=`<tr><td colspan="5" style="text-align:center;color:var(--muted)">empty — nothing measured yet</td></tr>`;
+    for(let i=0;i<n;i++) t+=`<tr><td>s<sub>${S.k-n+i}</sub>${i===n-1?' <span class="small">(newest)</span>':''}</td><td>${vec(S.S[i])}</td><td>${vec(S.Y[i])}</td><td>${fmt(dot(S.S[i],S.Y[i]))}</td><td>${fmt(1/dot(S.S[i],S.Y[i]))}</td></tr>`;
+    el('memtab').innerHTML=t;
+    const idx=i=>S.k-n+i;
+    let tr=`<span class="l">① q ← ∇f = ${vec(pv.g)}</span>`;
+    if(!n) tr+=`<span class="l l1">② no pairs: loop 1 does nothing</span>`;
+    for(const e of pv.tr){
+      if(e.loop===1) tr+=`<span class="l l1">② i=${idx(e.i)}: α = ρ (s·q) = ${fmt(e.rho)}·${fmt(e.a/e.rho)} = <b>${fmt(e.a)}</b>; &nbsp;q ← q − α y = ${vec(e.q)}</span>`;
+      else if(e.loop===0) tr+=`<span class="l ls">③ r ← γ q, &nbsp;γ = ${n?`s·y/y·y = ${fmt(pv.gamma)}`:`1/|∇f| = ${fmt(pv.gamma)}`} &nbsp;→ r = ${vec(e.r)}</span>`;
+      else tr+=`<span class="l l2">④ i=${idx(e.i)}: β = ρ (y·r) = <b>${fmt(e.b)}</b>; &nbsp;r ← r + (α − β) s = r + (${fmt(e.a-e.b)}) s = ${vec(e.r)}</span>`;
+    }
+    if(!n) tr+=`<span class="l l2">④ no pairs: loop 2 does nothing</span>`;
+    const cosang=dot(pv.p,sc(pv.g,-1))/(nrm(pv.p)*nrm(pv.g)||1), ang=Math.acos(Math.max(-1,Math.min(1,cosang)))*180/Math.PI;
+    tr+=`<span class="l">⑤ p = −r = <b>${vec(pv.p)}</b> &nbsp;(${ang.toFixed(1)}° away from −∇f; implied H<sub>k</sub> = ${mat(pv.Hk)})</span>`;
+    el('looptrace').innerHTML=S.done?`<span class="tag ok">converged</span> |∇f| &lt; 10⁻⁷ after ${S.k} iterations`:tr;
+    const L=S.last;
+    el('laststep').innerHTML=!L?'—':L.fail?`<span class="tag bad">line search failed</span> p was not a descent direction`:
+      `α = <b>${fmt(L.alpha)}</b> after ${L.tries} trial${L.tries>1?'s':''} · f: ${fmt(L.f0)} → ${fmt(L.fn)} · new pair s = ${vec(L.s)}, y = ${vec(L.y)}, s·y = ${fmt(L.sy)} `+
+      (L.accepted?`<span class="tag ok">stored</span>`:`<span class="tag bad">rejected: s·y ≤ 0</span> (curvature condition failed)`);
+    el('note').innerHTML=narrative(pv);
+  }
+  function narrative(pv){
+    const n=S.S.length, Ht=F.H(...pv.x), e=eig2(Ht), cond=e.l2>0?e.l1/e.l2:Infinity;
+    if(S.fail) return 'The backtracking line search could not find a decrease: the memory holds a pair from a non-convex region and the direction is no longer downhill. Production codes avoid this with a strong-Wolfe line search and pair rejection.';
+    if(S.done) return `Converged in ${S.k} iterations${el('showgd').checked?` (gradient descent: ${S.gd.k}${S.gd.done?'':'+'})`:''}. Try m = 1, another landscape, or click a new start.`;
+    if(S.k===0) return `No pairs yet, so the recursion reduces to p = −γ∇f with γ = 1/|∇f|: a unit step of steepest descent, the red and blue arrows coincide. Local condition number ${isFinite(cond)?fmt(cond):'∞'}.`;
+    if(n===1) return `One pair. Loop 1 strips from ∇f its component along s₀ (α₀), loop 2 puts it back scaled by the measured inverse curvature. So along s₀ the step is Newton-like, in the perpendicular direction it is just γ·steepest descent. The blue ellipse is stretched along s₀ and p already tilts towards the valley floor.`;
+    return `${n} pairs in memory${n>=m?' (full: the oldest is dropped at every step)':''}. In 2-D, two independent pairs pin down the whole inverse Hessian, so on the bowl the blue ellipse matches the green one and p points at the minimum. On the curved landscapes old pairs describe stale curvature, so the match is approximate and the line search occasionally backtracks — the same thing happens in your 6–15-D THz fits, where the n·d valley bends.`;
+  }
+  fillSelect(el('fsel'),f=>{F=f;P.setF(F);reset();});
+  el('mem').oninput=e=>{m=+e.target.value; el('memv').textContent=m; while(S.S.length>m){S.S.shift();S.Y.shift();} draw();};
+  el('step').onclick=step; el('reset').onclick=()=>reset(); el('showgd').onchange=draw; P.onClick(p=>reset(p));
+  document.addEventListener('keydown',e=>{if(!el('t5').classList.contains('on'))return; if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();step();}});
+  redraw.t5=draw; reset();
+})();
+})();
+</script>
+</body>
+</html>
