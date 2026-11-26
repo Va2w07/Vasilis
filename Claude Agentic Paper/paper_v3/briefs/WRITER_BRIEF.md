@@ -1,0 +1,24 @@
+# Writer brief — reduce the manuscript to 8 pages
+
+Working directory: `/home/claude/work/paper_v3`. Start from `main_v2_accepted.tex` (20 pages when compiled with the Optica class). Produce `main.tex` (same preamble, same class) that compiles with `pdflatex main; bibtex main; pdflatex; pdflatex` to **≤ 8 pages including references**. Compile with the command in `briefs/compile.sh` and check `pdfinfo main.pdf`. Also read `DECISIONS_LOG.md` (rulings R1–R10) and `briefs/CODER_BRIEF.md` (figure names and what each contains).
+
+Target structure (section numbers of the brief refer to the old manuscript):
+1. Introduction — ≤ 2 paragraphs, keep the citations that survive.
+2. Forward model (TMM) — keep eqs (1)–(3), two short paragraphs.
+3. Inverse problem — parametrisation (scaled factors), loss (MAE + log-cosh; rMSE for simulations), Adam (eq. for the update only), L-BFGS (one paragraph: quasi-Newton, strong-Wolfe, same autograd gradients). **Bayesian seeding**: one sentence only — it was used in earlier work and abandoned because it was inefficient (in 15 dimensions it moved the start into a wrong echo-assignment basin and cost more forward evaluations than it saved); multi-start replaces it.
+4. Simulated extractions — 4.1 five layers: one very short paragraph + Fig. 1 (two small panels), **no table**; errors go in the caption. 4.2 thin film on substrate with the measured reference pulse + **the polyimide-on-Si experiment** as the experimental counterpart (Fig. 2, one table with the PI/Si parameters, Cramér–Rao bounds, and the independent profilometer/visible-index values).
+5. Experimental quartz/Si — measurement, fit, Fig. 3, table of the three starts/fits + softplus-constrained row + CR row.
+6. Loss landscape — 6.1 sensitivity matrix (figure, can be a panel of the two-phase figure); 6.2 two-phase descent (Fig. 4); **6.3 Cramér–Rao, step by step**: (i) what the bound is and the assumptions (model exact, white noise σ measured on the pre-pulse), (ii) how J is obtained, (iii) the bound on each parameter, (iv) κ₂ fitted at −1.5·10⁻³ against a bound of ~1.6·10⁻⁵, i.e. ~90σ, so noise cannot have produced the sign, (v) the constrained fit shows that forcing κ₂ = 0 costs ~0.25 % in loss, far less than noise-level changes elsewhere would, (vi) therefore the negative sign is the frequency-independent model absorbing an amplitude mismatch, i.e. a model artefact — and the dispersive fit of Sec. 8 removes it. **6.4 κ ≥ 0** via softplus: a few lines, no figure (rectifier mentioned only as the alternative that freezes). Old Figs 6 and 7 are gone.
+7. **L-BFGS vs Adam** — the emphasis is on the optimiser, not on the loss function (we cannot know the ground truth): function evaluations to reach the same loss, trajectory in the same PCA planes (Fig. 5), where each lands along the n·d valley; one sentence that a combined time+frequency loss carries no extra information (same CR bounds). Remove the old Table 4 or reduce it to the Adam/L-BFGS rows only.
+8. Quartz–air–silicon, six knots — run 3 only, knot model only (never mention polynomials). Figs 6 and 7 (fit + residual spectrum; n(f), κ(f) with knots), one table of knot values and thicknesses. Points to make: air gap is far better conditioned than the per-layer n–d split; quartz κ rises almost linearly; Si lossless; n_Si still ~0.7 % below the literature value because of the n·d valley.
+9. Discussion + conclusions — merged into one short section (≤ 0.6 page).
+
+Writing rules
+- **Numbers**: prose carries only the numbers needed to make an argument (e.g. 90σ in 6.3; the threshold round-trip time). Everything else goes to tables, figures or captions. Where you need a number that is not yet in `results/*.json`, write `\num{XX}` with a `\todo{}` note so the reviewer sees it; the coder's JSONs are the only source of numbers — never carry a number over from the old manuscript without checking it still holds for the regenerated results (if the JSON is not there yet, mark it `\todo{[nb3]}` etc.).
+- Keep the author block and the `\todo{}` items for the authors (sample details, funding).
+- Keep British spelling, the paper's `\kap`, `\Lt`, siunitx conventions.
+- Every figure referenced must be one of: `fig1_five_layer`, `fig2_thin_film`, `fig3_exp_fit`, `fig4_adam_two_phase`, `fig5_lbfgs_trajectory`, `fig6_qas_fit`, `fig7_qas_nk` (plus `fig_sensitivity` if it is not merged). Until the coder has produced them, use `\includegraphics` with those names anyway (the compile script creates placeholder PNGs for missing files).
+- Captions carry the numbers (errors, losses, σ multiples), so they may be longer than usual.
+- The abstract must be ≤ 200 words and contain no more than four numbers.
+- Remove citations that are no longer used; do not add new ones unless necessary.
+- When done write `reviews/writer_report_loop0.md`: page count, what was cut, where you deviated from the brief and why, and the list of numbers marked `\todo` awaiting the coder.

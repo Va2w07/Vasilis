@@ -1,0 +1,634 @@
+Terahertz multi-layer material parameter
+extraction with a differentiable transfer-matrix
+model: what the loss landscape says about what
+can be measured
+T HEO S MITH , 1 A RTA L ATIFI , 2 N ICHOLAS T. K LOKKOU , 1 B EN
+B EDDOES , 1 J ON G ORECKI , 2 G EORGIOS D. B ARMPARIS , 3 AND
+VASILIS A POSTOLOPOULOS *,3,1
+1 School of Physics and Astronomy, University of Southampton, Southampton SO17 1BJ, United Kingdom
+2 Royal School of Mines, Imperial College London, London SW7 2AZ, United Kingdom
+3 Laser and THz Laboratory, Department of Physics, University of Crete, Heraklion 70013, Greece
+4 Twenty-One Semiconductors GmbH, Neckartenzlingen, Germany
+5 Optoelectronics Research Centre, University of Southampton, Southampton SO17 1BJ, United Kingdom
+[author list, affiliations, postcodes and order to be confirmed]
+* v.apostolopoulos@physics.uoc.gr
+
+
+
+Abstract: Terahertz time-domain spectroscopy can in principle return the thickness and
+complex refractive index of every layer of a stratified sample from one transmission trace, but the
+inverse problem is unstable once the sample is thin or has several layers. We fit a differentiable
+transfer-matrix model to the measured pulse with the gradient optimisers Adam and L-BFGS
+and extract 𝑛, 𝜅 and 𝑑 of every layer. Simulations with a measured reference pulse locate the
+film thickness below which a thin film can no longer be separated from its substrate, and a
+polyimide film on silicon at that threshold is recovered in agreement with profilometry. On a
+quartz-on-silicon bilayer the sensitivity matrix of the forward model constrains the total optical
+path three orders of magnitude better than the extinction coefficients and separates 𝑛 from 𝑑 only
+through the Fabry–Pérot echoes; the optimiser trajectory, projected onto the principal planes of
+its own path, shows Adam creeping along a flat 𝜅 valley for most of its budget, whereas L-BFGS
+completes the well-conditioned part of the descent in a few hundred evaluations. Cramér–Rao
+bounds show that the negative silicon 𝜅 of the frequency-independent fit is a model artefact,
+removed by a six-knot dispersive model of a quartz–air–silicon stack.
+
+© 2026 Optica Publishing Group under the terms of the Optica Open Access Publishing Agreement
+
+1.   Introduction
+
+Terahertz time-domain spectroscopy (THz-TDS) yields the complex refractive index of a sample
+from the transmitted field of a picosecond pulse [1–3]. For an optically thick slab the classical
+frequency-by-frequency inversion [2] is stable and noise-limited [4]; for thin samples or several
+layers internal reflections overlap, the transfer function admits several solutions and the objective
+becomes non-convex [5], so thickness and index can no longer be separated, precisely in the
+thickness-gauging regime where THz-TDS is most in demand [6]. Fitting the whole time trace [7]
+replaces the inversion by a non-convex optimisation whose behaviour is rarely examined.
+   Here the extraction is treated as an inverse problem [8] with the transfer-matrix method
+(TMM) [9] as forward model, implemented with automatic differentiation [10] so that 𝑑, 𝑛 and 𝜅
+of every layer are fitted simultaneously with Adam [11] or L-BFGS [12]. Simulations with a
+measured reference pulse locate where a thin film on a substrate ceases to be extractable, and
+a polyimide film on silicon confirms the prediction. The loss landscape of an experimental
+quartz-on-silicon fit is then analysed through the sensitivity matrix of the forward model and,
+borrowing from deep learning [13], through projections of the optimiser trajectory onto the
+planes in which it actually moves; a six-knot dispersive model of a quartz–air–silicon stack closes
+the paper.
+
+2.   Forward model: transfer-matrix method
+For a pulse entering layer 𝑗 of complex index 𝑛˜ 𝑗 = 𝑛 𝑗 − 𝑖𝜅 𝑗 and thickness 𝑑 𝑗 from a medium of
+index 𝑛0 , with 𝐷 𝑗 = 𝜔𝑑 𝑗 /𝑐, continuity of the tangential fields gives [9]
+                                                         
+                                              𝑛0     𝑛˜ 𝑗
+                                 𝑖            ˜
+                                              𝑛 𝑗
+                                                  −  𝑛  0
+                                                            sin( 𝑛˜ 𝑗 𝐷 𝑗 )
+                           𝑟𝑗 =                                               ,              (1)
+                                 2 cos( 𝑛˜ 𝐷 ) + 𝑖 𝑛0 + 𝑛˜ 𝑗 sin( 𝑛˜ 𝐷 )
+                                          𝑗 𝑗       2 𝑛˜ 𝑗      𝑛0          𝑗 𝑗
+
+                                                                1
+                             𝑡𝑗 =                                                                ,      (2)
+                                                               𝑛0     𝑛˜ 𝑗
+                                    cos( 𝑛˜ 𝑗 𝐷 𝑗 ) + 2𝑖       𝑛˜ 𝑗 + 𝑛0         sin( 𝑛˜ 𝑗 𝐷 𝑗 )
+
+combined recursively over the layers into the transmission 𝑇 (𝜔) of the stack. The sample pulse
+is the measured reference pulse 𝑥(𝑡) filtered by 𝑇,
+
+                                       𝑦(𝑡) = F −1 [𝑇 (𝜔) F [𝑥(𝑡)]] ,                                     (3)
+
+on a zero-padded grid (4𝐿 points for 𝐿 samples). Every operation is differentiable.
+
+3.   Inverse problem: parameters, loss and optimisers
+Until Section 8 each layer has a frequency-independent index, so 𝑁 layers give 3𝑁 parameters
+{𝑛 𝑗 , 𝜅 𝑗 , 𝑑 𝑗 }, optimised as dimensionless factors 𝑠𝑖 with 𝑝 𝑖 = 𝑠𝑖 𝑝 𝑖(0) about the initial guess 𝑝 (0) ,
+so that a step is the same fractional change for every parameter; the landscape analysis uses the
+same scaling, 𝑥𝑖 = ( 𝑝 𝑖 − 𝑝 𝑖 )/𝑝 𝑖(0) . The prediction 𝑦ˆ (𝑡; 𝜃) is compared with the measured pulse
+                                 opt
+
+by the root-mean-square error for the simulations and for the experiments by
+                                       1 ∑︁                  1 ∑︁
+                         Lexp (𝜃) =         | 𝑦ˆ 𝑖 − 𝑦 𝑖 | +      ln cosh( 𝑦ˆ 𝑖 − 𝑦 𝑖 ) ,                 (4)
+                                       𝐿 𝑖                   𝐿 𝑖
+
+which tolerates the few large residuals near the main pulse that a frequency-independent model
+cannot remove and is V-shaped around the optimum. Throughout, the noise floor 𝜎 is the standard
+deviation of the first 10 ps of the sample trace, before the pulse (of the measured reference for the
+simulated sweep).
+  Gradients come from automatic differentiation through the forward model. Adam [11] keeps
+moving averages 𝑚ˆ 𝑡 , 𝑣ˆ 𝑡 of the gradient and of its square and updates
+                                                             √︁
+                                      𝜃 𝑡+1 = 𝜃 𝑡 − 𝜂 𝑚ˆ 𝑡 /( 𝑣ˆ 𝑡 + 𝜖),                          (5)
+
+so every parameter moves at roughly the same rate 𝜂 however weakly the loss depends on it, and
+in a flat direction Adam keeps walking as long as the gradient keeps its sign. L-BFGS [12] builds
+a curvature estimate from the gradient history and sets the step by a strong-Wolfe line search.
+Both are local and the basin of a THz fit is narrow, so each fit is run from several starts around the
+nominal guess and the lowest loss kept; Bayesian optimisation of the start, used in earlier work,
+was abandoned because in fifteen dimensions it moved the start into the wrong echo-assignment
+basin at a cost of more evaluations than it saved.
+
+4.   Simulated extractions and a thin film at the limit
+A noise-free five-layer stack with fifteen free parameters (𝑛 = 3.4/2.5/5.4/4.2/1.7, 𝜅 =
+0.006/0.004/0.005/0.001/0.01, 𝑑 = 70/200/100/200/50 µm), fitted by multi-start L-BFGS
+                        (a)                              film round trip 2nfd/c (ps)
+                                                                                                     (b)
+                                                         0.2           0.5       1        2
+
+
+
+
+              |error| of film parameter (%)
+                                                                                                                                                      measured
+                                              101                                                                       1                             fit
+
+
+
+
+                                                                                                     field (arb. u.)
+                                                                                                                                                      residual ×10
+                                              100                                                                       0
+
+
+                                                                                                                       −1                             Si echo
+                                              10−1
+
+                                                                                                                       −2
+                                              10−2       n         κ         d
+
+                                                     5       10        20            50   100                                      15          20           25
+                                                         film thickness d (µm)                                                           time (ps)
+
+         Fig. 1. Thin film on a substrate. (a) Simulated sweep with the measured reference (film
+         𝑛 = 3.6, 𝜅 = 0.0203; substrate 𝑛 = 2.213, 𝜅 = 0.0125, 𝑑 = 496 µm; 𝜎 = 1.58 × 10 −3 ,
+         power SNR 44 dB): median (symbols) and range (bands) of the film’s errors over three
+         noise draws; top axis, round trip 2𝑛f 𝑑/𝑐. Medians at 5, 10, 20 µm: 𝑛 1.9, 0.29, 0.03 %;
+         𝑑 4.8, 0.99, 0.08 %; 𝜅 25, 8.3, 6.3 %. (b) Polyimide on silicon, measured and fitted
+         pulse with residual.
+
+
+
+
+         Table 1. Polyimide on silicon (𝜎 = 1.35 × 10 −3 ; thicknesses in µm): best of eight L-
+         BFGS starts, Cramér–Rao bound, the local minimum of two starts, and the independent
+         values (𝑛 ∥ at 633 nm, profilometer, silicon index from Ref. [14]).
+
+                                                                   𝑛PI           𝜅PI          𝑑PI    𝑛Si                     𝜅Si         𝑑Si        𝑛PI 𝑑PI rMSE/𝜎
+
+            THz fit (best)                                        1.712      < 10 −6 25.84          3.259                   0.0006      400.2       44.26        2.69
+            Cramér–Rao 1𝜎 0.0024                                             0.0018       0.062 0.0002                      0.0001      0.030       0.052
+            local minimum                                         1.611      0.0107       28.47     3.255                   < 10 −6 401.3           45.87        3.34
+
+            independent                                           1.726                   24.7      3.4175                                          42.6
+
+
+
+
+from a hand guess within 𝑛 ± 0.3, 𝜅 ± 0.005, 𝑑 ± 30 %, is recovered to 0.001 % in 𝑛, 0.002 % in
+𝑑 and 0.3 % in 𝜅: the method handles the stack, and the extinction coefficients are two orders of
+magnitude less accurate than the indices.
+   For the most demanding geometry, a thin film on a thick substrate, we scan the film thickness
+across the point at which the film’s internal reflection separates from the main pulse, using
+the measured reference of Section 5 and white noise at its 𝜎 (three draws, six free parameters,
+multi-start L-BFGS). Figure 1(a) shows the film’s errors: 𝑛 and 𝑑 degrade gracefully as the
+film thins and fail steeply below a round trip of about 0.24 ps (10 µm), once the film echo no
+longer leaves the main pulse; 𝜅 is one to two orders of magnitude worse at every thickness.
+The converged loss is (0.98–1.00) 𝜎 throughout, so the errors are set by the noise, and the
+echoes [5, 6] are what separates 𝑛 from 𝑑.
+   The experimental counterpart is a spin-coated polyimide film (HD Microsystems PI-2525)
+on a high-resistivity silicon wafer [sample details], its thickness known from profilometry and
+its visible index from white-light interferometry (Table 1). Its round trip of 0.30 ps sits at the
+threshold of Fig. 1(a), so the extraction should be marginal in 𝑛 and 𝑑 separately and good in 𝑛 𝑑,
+and so it is: six of eight starts agree to within 1 % at a loss of 2.7𝜎, but the split puts 𝑑PI 4.6 %
+above the profilometer value and 𝑛PI 0.8 % below 𝑛 ∥ (633 nm), with 𝜌(𝑛PI , 𝑑PI ) = −0.93 and a
+discrepancy eighteen times the Cramér–Rao bound. Two starts end in a 𝜅-driven local minimum
+(Table 1), and a plain full-band fit from 16 µm collapses to 𝑑PI = 22.3 µm, 𝑛PI = 1.93 at 48 %
+higher loss: the simulated failure mode in the flesh.
+                             (a)
+                                                                                                                                         echoes
+                                            2                                                   0.25
+
+
+
+
+                         field (arb. u.)
+                                                                                                0.00
+
+                                            0                                                 −0.25
+
+                                                                                                           30              35   40          45        50      55        60
+
+                                           −2
+                                                                                                                       reference            sample           fit (start 1)
+
+                                                 10              20                    30                            40                    50                  60
+                                                                                                  time (ps)
+                     (b)                                                                               (c)
+                                                                                                                    103
+                                           0.1                                       residual                                                                     sample
+
+
+
+
+                                                                                                       |spectrum|
+                                                                                     ±σ                                                                           fit
+                    residual
+
+
+
+
+                                           0.0                                                                      101                                           residual
+
+
+                                −0.1
+                                                                                                                    10−1
+                                                 10   20    30        40        50       60                                0         1            2           3              4
+                                                                time (ps)                                                                frequency (THz)
+
+               Fig. 2. Quartz/Si extraction. (a) Measured reference and sample pulses with the
+               converged fit (start 1); inset, the echoes. (b) Residual against ±𝜎, concentrated at the
+               main pulse and the first echo. (c) Amplitude spectra; above 1.5 THz the fit lies above
+               the measurement, the signature of absorption increasing with frequency.
+
+               Table 2.        Quartz/Si fits (2 × 104 Adam iterations) from three starts
+               (𝑛1 = 1.982/1.900/2.010, 𝑑1 = 1000/900/900 µm, 𝜅1 = 0.0071; silicon
+               3.40/0.0054/400 µm), from start 1 with the softplus constraint 𝜅 ≥ 0, and the Cramér–
+               Rao bounds (Section 6.2). Fits 2 and 3 lie within 2×10 −4 (𝑛1 ), 0.15 µm (𝑑1 ), 1.5×10 −3
+               (𝑛2 ) and 0.16 µm (𝑑2 ) of fit 1.
+
+                                                           𝑛1              𝜅1           𝑑1 (µm)                       𝑛2                  𝜅2           𝑑2 (µm)                   loss
+
+       fit 1                                           1.9639         0.00541            994.28                     3.4478      −0.00144               381.41          4.4522 × 10 −3
+       fit 1, 𝜅 ≥ 0 (softplus)                         1.9595         0.00478            996.60                     3.4681         0.00011             379.11          4.4646 × 10 −3
+
+       Cramér–Rao 1𝜎                                  6 × 10 −5 9 × 10 −6                   0.032              3 × 10 −4 1.9 × 10 −5                       0.031
+
+
+5.     Experimental extraction: quartz on silicon
+A quartz plate bonded to a silicon wafer [bonding method, nominal thicknesses and supplier to
+be added] was measured with a Menlo Systems TeraSmart spectrometer under nitrogen purge
+(1000 waveforms over 15 min, 2425 points at 33 fs; 𝜎 = 2.9 × 10−4 , peak-to-𝜎 ratio 7.9 × 103 )
+and fitted with Eq. (4) and Adam at 𝜂 = 10−4 for 2 × 104 iterations from three starts bracketing
+the expected quartz index (Fig. 2, Table 2). The starts converge to the same point to four figures
+in 𝑛 and 𝑑; the quartz index is that of fused silica [1, 3] rather than crystalline quartz [confirm
+sample material], the silicon index is within a percent of the literature value [14], and the silicon
+extinction coefficient is negative, which is unphysical. The loss falls by an order of magnitude in
+the first 8 % of the iterations and only slowly thereafter, and the mean absolute residual at the
+optimum is 15𝜎 (Fig. 2(b)).
+
+6.     The loss landscape of the experimental fit
+6.1.      Sensitivity matrix and the two-phase descent
+In the scaled coordinates 𝑥𝑖 about the optimum of Table 2, the geometry of the problem is
+described, independently of the cone-shaped loss, by the sensitivity matrix of the forward
+model [8, 15],
+                                     1              𝜕 𝑦ˆ (𝑡 𝑡 )
+                               𝐺 = 𝐽 ⊤ 𝐽,     𝐽𝑡𝑖 =             ,                      (6)
+                                    𝐿                 𝜕𝑥 𝑖
+                          (a)                  Phase I, start 1                    (b)                        start 2                     (c)                  start 3
+
+                                                                  10                                     10
+                                                                                                                                                0.0
+
+
+
+
+              +0.65n2 +0.58n1
+                                                                                                                                                                            10
+
+
+
+
+                                                                                                                             -0.81n1 +0.54d2
+                                                                           -0.56n2 -0.56d2
+                                        0.1                                                  0.2                                                                            100
+
+
+
+
+                PC2 (19 %)
+
+
+
+
+                                                                             PC2 (12 %)
+
+
+
+
+                                                                                                                                PC2 (10 %)
+                                                                                                         100
+                                                                                                                                                             1,000
+
+                                                 1,000                                       0.0
+                                        0.0                       100                                           1,000                          −0.2
+
+
+
+                                                 0.0         0.1                                    −0.5        0.0                                      0.0             0.5
+                                          PC1 (78 %): -0.69n1 +0.60d2                          PC1 (86 %): +0.65d1 -0.50n2                        PC1 (90 %): -0.79d1 +0.58n2
+
+
+
+                         (d)                        Phase II, shared plane (it. 1,615–20,000)                                    (e)                        Convergence
+              -0.97κ1 +0.24κ2 +0.05n2
+
+
+                                                                                                                                6 × 10−2                                 I | II
+                                        0.4
+                                                                                                                                                                         it. 1,615
+                                                                                                                                4 × 10−2
+                                                                          10,000
+                                                                                                                                3 × 10−2
+                      PC2 (7 %)
+
+
+
+
+                                                                                                                        loss
+                                        0.2                                                                                     2 × 10−2
+
+                                                              ● start ★ end ○ iteration                                                        10−2
+                                                                       start 1                 start 3
+                                        0.0                                                                                     6 × 10−3
+                                                                       start 2
+                                                                                                                                4 × 10−3
+                                                    0.0             0.5              1.0              1.5                                             100       102        104
+                                              PC1 (92 %): +0.97κ2 +0.24κ1 -0.05n2 [fraction of nominal]                                                      iteration
+
+         Fig. 3. The Adam descent of the quartz/Si fit in the principal planes of its own path
+         (+ optimum, • start, ★ end of phase). (a)–(c) Phase I, iterations 1–1615, one panel
+         per start in curvature-normalised coordinates. (d) Phase II, shared plane (99.7 % of
+         the path variance): the merged starts creep along the valley 0.97𝜅2 + 0.24𝜅 1 , taking 𝜅2
+         through zero. (e) Loss versus iteration.
+
+whose eigenvectors are the parameter combinations along which the pulse changes most and least
+and whose singular values, 8.66, 1.54, 0.69, 0.073, 0.019 and 0.0016, span a factor of 5500. The
+best-constrained direction is the total optical path, fixed by the pulse delay; after two directions
+that redistribute optical path comes a gap of an order of magnitude to the anti-phase combination
+(𝑛2 up, 𝑑2 down) that leaves 𝑛2 𝑑2 unchanged, the optical-thickness degeneracy (𝜌(𝑛1 , 𝑑1 ) = 0.97,
+𝜌(𝑛2 , 𝑑2 ) = 0.99), lifted only by the echoes, whose Fresnel coefficients depend on 𝑛 alone.
+Another order of magnitude down are the two extinction coefficients: per unit fractional change,
+𝜅 1 is 280 times and 𝜅2 890 times less visible than 𝑛1 .
+   How an optimiser moves through this landscape is best seen in the plane the trajectory itself
+chooses [13]: the two leading principal components of the centred iterates span it, the loss is
+evaluated on a grid in it and the path projected onto it. Over the whole run almost all of the path
+variance lies along 𝜅 2 , yet the loss barely depends on that motion, so we split the run where every
+start has completed 95 % of its loss decrease, iteration   √ 1615 (Fig. 3), with one plane per start
+in curvature-normalised coordinates (axes scaled by 𝐺 𝑖𝑖 ) for Phase I and a shared plane for
+Phase II. In Phase I the loss drops by 81–92 % as each start descends a bowl whose axes are the
+best-constrained combinations of 𝑛 and 𝑑; in Phase II, 92 % of the budget, the starts drift along
+the same 𝜅 valley at Adam’s full speed for a further 22–29 %.
+
+6.2.   Noise-limited uncertainties, and why 𝜅Si < 0 is a model artefact
+Whether the negative silicon extinction coefficient is a statistical fluctuation or a systematic
+effect the sensitivity matrix decides, step by step. (i) If the model were exact and the residual
+white noise of standard deviation 𝜎, the covariance of any unbiased estimator would obey
+the Cramér–Rao bound cov( 𝑥)     ˆ ≥ 𝜎 2 (𝐽 ⊤ 𝐽) −1 [15], a property of the measurement, not of the
+optimiser; (ii) 𝐽 is Eq. (6) at the optimum. (iii) The square roots of the diagonal are the bounds
+in Table 2: the indices at the 10−4 level, the thicknesses at 31 nm, 𝜅 2 at 1.9 × 10−5 . (iv) The
+fitted 𝜅 2 = −1.5 × 10−3 is therefore 77𝜎 from zero: noise cannot have produced the sign. (v)
+Forcing 𝜅 2 ≥ 0 and re-optimising everything else raises the loss by only 0.29 %: the negative 𝜅 2
+buys almost nothing. (vi) The sign is therefore the frequency-independent model absorbing the
+high-frequency amplitude excess of Fig. 2(c) through the one parameter the data leave nearly
+free: a model artefact, which the dispersive fit of Section 8 removes. The constraint in (v) is the
+                          (a)                 Phase-I plane, start 1              (b)             Phase-I plane, start 2                   (c)         Phase-I plane, start 3
+
+
+
+
+              +0.65n2 +0.58n1
+
+
+
+
+                                                                                                                              -0.81n1 +0.54d2
+                                                                          -0.56n2 -0.56d2
+                                        0.1                                                 0.2                                                  0.0
+
+
+
+
+                PC2 (19 %)
+
+
+
+
+                                                                            PC2 (12 %)
+
+
+
+
+                                                                                                                                 PC2 (10 %)
+                                                                                            0.0                                                 −0.2
+                                        0.0
+
+
+                                                                                                                                                −0.4
+                                                 0.0      0.1                                     −0.5        0.0                                         0.0             0.5
+                                          PC1 (78 %): -0.69n1 +0.60d2                         PC1 (86 %): +0.65d1 -0.50n2                          PC1 (90 %): -0.79d1 +0.58n2
+
+
+
+                         (d)                              Phase-II plane of Fig. 4 (shared)                                       (e)                        Convergence
+              -0.97κ1 +0.24κ2 +0.05n2
+
+                                               ● start ★ end + Adam optimum
+                                                                                                                                  6 × 10−2                            Adam
+                                        0.6          Adam (Phase II)                                                                                                  L-BFGS
+                                                                                                                                  4 × 10−2
+                                                     L-BFGS (every iterate)                                                       3 × 10−2
+                      PC2 (7 %)
+
+
+
+
+                                        0.4
+
+
+
+
+                                                                                                                           loss
+                                                                                                                                  2 × 10−2
+                                        0.2
+                                                                                                                                                10−2
+
+                                        0.0                                                                                       6 × 10−3
+                                                                                                                                  4 × 10−3
+                                                    0.0             0.5              1.0              1.5                                              100      102        104
+                                               PC1 (92 %): +0.97κ2 +0.24κ1 -0.05n2 [fraction of nominal]                                               function evaluations
+
+         Fig. 4. L-BFGS on the quartz/Si fit in the planes of Fig. 3, every iterate marked, Adam’s
+         path drawn faintly. (a)–(c) Phase-I planes; (d) Phase-II plane, where L-BFGS stops
+         at the kink before the valley; (e) loss versus function evaluations. End points (start 1;
+         evaluations over the three starts): Adam, 2 × 104 iterations, 𝑑1 = 994.3, 𝑑2 = 381.4 µm,
+         𝜅2 = −0.0014, 𝑛1 𝑑1 = 1.9526, 𝑛2 𝑑2 = 1.3150 mm; L-BFGS on the same loss, 250–299
+         evaluations, 999.6, 376.1 µm, +0.0044, 1.9528, 1.3146 mm; L-BFGS on the rMSE
+         (181–314 evaluations) or log-cosh (178–484) loss, 977.7, 398.1 µm, −0.0073, 1.9523,
+         1.3153 mm.
+
+map 𝜅 𝑗 = 𝜅 (0)
+             𝑗 softplus(𝛽𝜃 𝑗 )/softplus(𝛽), 𝛽 = 5, which keeps a gradient everywhere, whereas a
+rectifier freezes the parameter the moment it reaches zero; the softplus fit (Table 2) drives 𝜅Si to
+zero, as expected for high-resistivity silicon [14], and moves 𝑛 and 𝑑 of each layer in opposite
+directions by up to 0.6 % while 𝑛1 𝑑1 and 𝑛2 𝑑2 change by 0.015 %: along the valley, not out of it.
+
+7.   L-BFGS versus Adam
+Adam creeps along the 𝜅 valley at a fixed normalised speed, whereas a quasi-Newton method
+learns the curvature. We therefore repeated the fit with L-BFGS (strong-Wolfe line search, history
+20) from the same three starts with the same scaled parameters and loss (Fig. 4). L-BFGS
+cuts across the Phase-I bowl instead of tracing Adam’s L-shaped route and reaches, in 250–300
+evaluations, the loss that Adam reaches after 5000–5900 iterations; then it stops. The stop
+is a kink, not a barrier: the line search finds no decrease even for steps of 10−8 , because the
+mean-absolute term of Eq. (4) is not differentiable where residual samples change sign, yet the
+loss decreases monotonically along the straight line to Adam’s end point, 3.7 % lower. The two
+end points differ by 5.7 µm in 𝑑1 and 𝑑2 , with 𝜅 Si still positive at the kink, while 𝑛1 𝑑1 and 𝑛2 𝑑2
+agree to 0.012 % and 0.034 %: what L-BFGS reaches twenty times cheaper is the part of the
+fit the data constrain; what it misses is the flat 𝜅 valley of Section 6, where the end point is
+decided by how the loss weights the model error. A smooth loss is the right companion for a
+quasi-Newton method: with the rMSE, or the log-cosh term alone, L-BFGS converges without a
+stall to yet another point of the 𝑛 𝑑 valley. A combined time- and frequency-domain loss adds no
+information, its Cramér–Rao bounds being those of the time trace.
+
+8.   Letting the model be right: quartz–air–silicon with six frequency knots
+Every diagnostic so far points to the missing frequency dependence of the optical constants,
+which we add in an interpretable, well-scaled form: 𝑛 𝑗 ( 𝑓 ) and 𝜅 𝑗 ( 𝑓 ) of each layer are the natural
+cubic interpolants of their values at six knots spanning the band in which the sample spectrum
+stays above the noise floor, 0.2–3.0 THz, held at the band-edge values outside it; each knot value
+                      (a)                                                                                                            (c)
+
+                                              1                                                     measured                                     103                           sample
+                                                                                                    fit, 6 knots                                                               residual, stage 1
+
+
+
+
+                           field (arb. u.)
+                                                                                                                                                                               residual, stage 2
+
+
+
+
+                                                                                                                          |amplitude spectrum|
+                                              0
+                                                                                                                                                 102
+
+
+                                             −1
+                                                                                                                                                 101
+
+                      (b)
+                                                                                                                                                 100
+
+
+
+
+                      residual
+                                             0.0
+
+                                  −0.1                        stage 1 (flat)         stage 2 (6 knots)        ±σ
+                                                                                                                                                 10−1
+                                                   10          20        30          40       50         60        70                                   0       1          2        3         4
+                                                                               time (ps)                                                                            frequency (THz)
+
+         Fig. 5. Quartz–air–silicon stack, six-knot model. (a) Measured and fitted pulse
+         (stage 2); (b) residual after stage 1 (knots tied) and stage 2 (knots free) against ±𝜎; (c)
+         amplitude spectra, fit band shaded. Freeing the knots lowers the loss from 3.62 × 10=3
+         to 2.93 × 10=3 (MAE from 4.0𝜎 to 3.2𝜎) and removes the pulse-shape residual; what
+         remains carries the Fabry–Pérot periodicity of the echoes.
+
+                                       (a)                                     quartz                              (b)                                                Si
+                                                   2.00             fit band               stage 2, 6 knots             3.400
+                                                                    stage 1 (flat)         knots
+                                                   1.99                                                                 3.395
+                                             n
+
+
+
+
+                                                                                                                   n
+                                                   1.98                                                                 3.390
+
+                                                   1.97                                                                 3.385
+
+                                                                                                                        3.380
+                                       (c)                                                                         (d)
+
+                                               0.010                                                                    0.004
+                                     κ
+
+
+
+
+                                                                                                                   κ
+
+
+
+
+                                               0.005                                                                    0.002
+
+
+                                               0.000                                                                    0.000
+
+                                                          0              1             2            3                                            0          1              2            3
+                                                                         frequency (THz)                                                                    frequency (THz)
+
+         Fig. 6. Extracted 𝑛( 𝑓 ) (top) and 𝜅( 𝑓 ) (bottom) of quartz (left) and silicon (right); knots
+         marked, stage 1 (tied) dotted, fit band shaded. Silicon 𝜅 stays below 1.2 × 10 −3 except
+         at the 3 THz knot, where the spectrum reaches the noise floor.
+
+         Table 3. Quartz–air–silicon fit: knot values after stage 2, stage-1 (tied) values,
+         thicknesses, optical thicknesses at 1 THz and losses (𝜎 = 9.0 × 10 −4 ).
+
+                                                                                           knot frequency (THz)                                                                                   stage 1
+
+                                                                0.20            0.76               1.32            1.88                                 2.44          3.00                        (tied)
+
+         quartz 𝑛                                             1.9652 1.9712 1.9727 1.9745 1.9780 1.9917                                                                                           1.9753
+                  𝜅                                           0.0006 0.0034 0.0068 0.0089 0.0110 0.0114                                                                                           0.0050
+         Si       𝑛                                           3.3963 3.3926 3.3928 3.3940 3.3916 3.3818                                                                                           3.3903
+                  𝜅                                           0.0012 0.0000 0.0009 0.0002 0.0007 0.0048                                                                                           0.0002
+
+         𝑑q , 𝑑air , 𝑑Si (µm)                                                                976.6, 125.9, 388.9                                                                     974.5, 126.8, 389.1
+         𝑛 𝑑 quartz, Si (µm)                                                                       1926.0, 1319.3                                                                           1924.9, 1319.3
+         loss, MAE/𝜎                                                                           2.93 × 10=3 , 3.2                                                                        3.62 × 10=3 , 4.0
+
+
+is 𝜃 init + 𝑠 𝜗 with a trainable 𝜗 and a fixed scale 𝑠, and 𝜅 ≥ 0 is imposed by a hinge penalty
+𝜆 𝜅 ⟨max(0, −𝜅 𝑗 ( 𝑓 ))⟩, 𝜆 𝜅 = 1. Adam runs in two stages, the knots of each curve tied in stage 1
+(the frequency-independent problem) and freed in stage 2. The sample is the quartz plate and
+silicon wafer of Section 5 re-mounted with an air gap, a third layer with 𝑛 = 1, 𝜅 = 0 frozen and
+only its thickness free (Figs. 5, 6, Table 3).
+    Three points follow. First, the air gap is far better conditioned than the per-layer 𝑛–𝑑 split,
+because it enters through the timing of two interfaces, not through an optical path that an index
+could compensate: a scan of the loss against 𝑑air shows a single sharp minimum at 126 µm, 5.5
+times lower than at the nominal 50 µm. Second, the quartz extinction rises almost linearly with
+frequency, as for fused silica rather than crystalline quartz [1, 3] [confirm sample material]; this
+rising 𝜅 is what drove 𝜅Si negative in Section 6.2, and with it in the model the silicon is lossless.
+Third, the silicon index remains 0.7 % below the literature value 3.4175 [14]: its optical thickness
+is identical to 0.01 % between stages, but the 𝑛–𝑑 split rests on the echo amplitudes alone, and a
+loss scan against 𝑛Si with 𝑑Si re-optimised puts the valley floor near 3.37 (literature value: +4 %
+in loss).
+
+9.   Discussion and conclusions
+A differentiable TMM fitted by gradient optimisers degrades gracefully in 𝑛 and 𝑑 and erratically
+in 𝜅 as a film thins, failing once the film echo no longer leaves the main pulse; on the quartz/Si
+bilayer it converges reproducibly but slowly. All of this follows from the sensitivity spectrum of
+the measurement: the total optical path is constrained thousands of times better than the extinction
+coefficients, the per-layer 𝑛–𝑑 split only by the echoes. L-BFGS reaches the data-constrained part
+of the optimum twenty times cheaper than Adam and, with a smooth loss, is the better default.
+Uncertainties from (𝐽 ⊤ 𝐽) −1 [4, 8, 15] must be read alongside the ratio of residual to noise floor:
+when it is far above unity, the honest uncertainty on 𝑑 is the spread between fits that weight the
+model error differently, here 2 %. [mechanically measured thickness to be included?]
+Funding. [to be added]
+Acknowledgments. [to be added]
+Disclosures. The authors declare no conflicts of interest. [confirm; industrial affiliation]
+Data availability. Traces and notebooks are available from the authors on request. [or a repository link]
+
+References
+1. D. Grischkowsky, S. Keiding, M. van Exter, and C. Fattinger, “Far-infrared time-domain spectroscopy with terahertz
+    beams of dielectrics and semiconductors,” J. Opt. Soc. Am. B 7, 2006–2015 (1990).
+2. L. Duvillaret, F. Garet, and J.-L. Coutaz, “A reliable method for extraction of material parameters in terahertz
+    time-domain spectroscopy,” IEEE J. Sel. Top. Quantum Electron. 2, 739–746 (1996).
+3. M. Naftaly and R. E. Miles, “Terahertz time-domain spectroscopy for material characterization,” Proc. IEEE 95,
+    1658–1665 (2007).
+4. W. Withayachumnankul, B. M. Fischer, H. Lin, and D. Abbott, “Uncertainty in terahertz time-domain spectroscopy
+    measurement,” J. Opt. Soc. Am. B 25, 1059–1072 (2008).
+5. M. Scheller, C. Jansen, and M. Koch, “Analyzing sub-100-𝜇m samples with transmission terahertz time domain
+    spectroscopy,” Opt. Commun. 282, 1304–1306 (2009).
+6. T. Yasui, T. Yasuda, K. ichi Sawanaka, and T. Araki, “Terahertz paintmeter for noncontact monitoring of thickness
+    and drying progress in paint film,” Appl. Opt. 44, 6849–6856 (2005).
+7. R. Peretti, S. Mitryukovskiy, K. Froberger, et al., “THz-TDS time-trace analysis for the extraction of material and
+    metamaterial parameters,” IEEE Trans. Terahertz Sci. Technol. 9, 136–149 (2019).
+8. R. C. Aster, B. Borchers, and C. H. Thurber, Parameter Estimation and Inverse Problems (Elsevier, Amsterdam,
+    2018), 3rd ed.
+9. M. Born and E. Wolf, Principles of Optics (Cambridge University Press, Cambridge, 1999), 7th ed.
+10. A. Paszke, S. Gross, F. Massa, et al., “PyTorch: An imperative style, high-performance deep learning library,” in
+    Advances in Neural Information Processing Systems 32, (2019), pp. 8024–8035.
+11. D. P. Kingma and J. Ba, “Adam: A method for stochastic optimization,” (2015). Int. Conf. on Learning Representations
+    (ICLR), San Diego, 2015; arXiv:1412.6980.
+12. J. Nocedal and S. J. Wright, Numerical Optimization (Springer, New York, 2006), 2nd ed.
+13. H. Li, Z. Xu, G. Taylor, et al., “Visualizing the loss landscape of neural nets,” in Advances in Neural Information
+    Processing Systems 31, (2018).
+14. J. Dai, J. Zhang, W. Zhang, and D. Grischkowsky, “Terahertz time-domain spectroscopy characterization of the
+    far-infrared absorption and index of refraction of high-resistivity, float-zone silicon,” J. Opt. Soc. Am. B 21,
+    1379–1386 (2004).
+15. S. M. Kay, Fundamentals of Statistical Signal Processing: Estimation Theory (Prentice Hall, Upper Saddle River, NJ,
+    1993).
+

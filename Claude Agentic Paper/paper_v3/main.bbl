@@ -1,0 +1,91 @@
+\begin{thebibliography}{10}
+\newcommand{\enquote}[1]{``#1''}
+
+\bibitem{Grischkowsky1990}
+D.~Grischkowsky, S.~Keiding, M.~van Exter, and C.~Fattinger,
+  \enquote{Far-infrared time-domain spectroscopy with terahertz beams of
+  dielectrics and semiconductors,} {\protect\JournalTitle{J. Opt. Soc. Am. B}}
+  \textbf{7}, 2006--2015 (1990).
+
+\bibitem{Duvillaret1996}
+L.~Duvillaret, F.~Garet, and J.-L. Coutaz, \enquote{A reliable method for
+  extraction of material parameters in terahertz time-domain spectroscopy,}
+  {\protect\JournalTitle{IEEE J. Sel. Top. Quantum Electron.}} \textbf{2},
+  739--746 (1996).
+
+\bibitem{Naftaly2007}
+M.~Naftaly and R.~E. Miles, \enquote{Terahertz time-domain spectroscopy for
+  material characterization,} {\protect\JournalTitle{Proc. IEEE}} \textbf{95},
+  1658--1665 (2007).
+
+\bibitem{Withayachumnankul2008}
+W.~Withayachumnankul, B.~M. Fischer, H.~Lin, and D.~Abbott,
+  \enquote{Uncertainty in terahertz time-domain spectroscopy measurement,}
+  {\protect\JournalTitle{J. Opt. Soc. Am. B}} \textbf{25}, 1059--1072 (2008).
+
+\bibitem{Scheller2009}
+M.~Scheller, C.~Jansen, and M.~Koch, \enquote{Analyzing sub-100-$\mu$m samples
+  with transmission terahertz time domain spectroscopy,}
+  {\protect\JournalTitle{Opt. Commun.}} \textbf{282}, 1304--1306 (2009).
+
+\bibitem{Yasui2005}
+T.~Yasui, T.~Yasuda, K.-i. Sawanaka, and T.~Araki, \enquote{Terahertz
+  paintmeter for noncontact monitoring of thickness and drying progress in
+  paint film,} {\protect\JournalTitle{Appl. Opt.}} \textbf{44}, 6849--6856
+  (2005).
+
+\bibitem{Peretti2019}
+R.~Peretti, S.~Mitryukovskiy, K.~Froberger, \emph{et~al.}, \enquote{{THz-TDS}
+  time-trace analysis for the extraction of material and metamaterial
+  parameters,} {\protect\JournalTitle{IEEE Trans. Terahertz Sci. Technol.}}
+  \textbf{9}, 136--149 (2019).
+
+\bibitem{Aster2018}
+R.~C. Aster, B.~Borchers, and C.~H. Thurber, \emph{Parameter Estimation and
+  Inverse Problems} (Elsevier, Amsterdam, 2018), 3rd ed.
+
+\bibitem{BornWolf1999}
+M.~Born and E.~Wolf, \emph{Principles of Optics} (Cambridge University Press,
+  Cambridge, 1999), 7th ed.
+
+\bibitem{Paszke2019}
+A.~Paszke, S.~Gross, F.~Massa, \emph{et~al.}, \enquote{{PyTorch}: An imperative
+  style, high-performance deep learning library,} in \emph{Advances in Neural
+  Information Processing Systems 32,}  (Curran Associates, 2019), pp.
+  8024--8035.
+
+\bibitem{Kingma2017}
+D.~P. Kingma and J.~Ba, \enquote{Adam: A method for stochastic optimization,}
+  in \emph{3rd International Conference on Learning Representations (ICLR),}
+  (San Diego, 2015). ArXiv:1412.6980.
+
+\bibitem{Nocedal2006}
+J.~Nocedal and S.~J. Wright, \emph{Numerical Optimization} (Springer, New York,
+  2006), 2nd ed.
+
+\bibitem{Dai2004}
+J.~Dai, J.~Zhang, W.~Zhang, and D.~Grischkowsky, \enquote{Terahertz time-domain
+  spectroscopy characterization of the far-infrared absorption and index of
+  refraction of high-resistivity, float-zone silicon,}
+  {\protect\JournalTitle{J. Opt. Soc. Am. B}} \textbf{21}, 1379--1386 (2004).
+
+\bibitem{Kay1993}
+S.~M. Kay, \emph{Fundamentals of Statistical Signal Processing: Estimation
+  Theory} (Prentice Hall, Upper Saddle River, NJ, 1993).
+
+\bibitem{Li2018}
+H.~Li, Z.~Xu, G.~Taylor, \emph{et~al.}, \enquote{Visualizing the loss landscape
+  of neural nets,} in \emph{Advances in Neural Information Processing Systems
+  31,}  (Curran Associates, 2018).
+
+\bibitem{White1980}
+H.~White, \enquote{A heteroskedasticity-consistent covariance matrix estimator
+  and a direct test for heteroskedasticity,}
+  {\protect\JournalTitle{Econometrica}} \textbf{48}, 817--838 (1980).
+
+\bibitem{Lewis2013}
+A.~S. Lewis and M.~L. Overton, \enquote{Nonsmooth optimization via
+  quasi-{Newton} methods,} {\protect\JournalTitle{Math. Program.}}
+  \textbf{141}, 135--163 (2013).
+
+\end{thebibliography}
