@@ -15,7 +15,7 @@ style of `code/paperstyle.py`.  Every number that can appear in the paper is in 
 | notebook | content | figures | results |
 |---|---|---|---|
 | `nb1_five_layer_simulation.ipynb` | synthetic pulse, five-layer stack, 15 parameters, coarse-to-fine L-BFGS from a hand guess (4 starts) | `fig1_five_layer` | `nb1.json` |
-| `nb2_thin_film_limits_and_PI.ipynb` | A: film-thickness sweep 5–100 µm with the measured reference pulse and measured noise (3 draws, 5 starts); B: polyimide on Si, multi-start fit, secondary minimum, Cramér–Rao bounds, comparison with profilometer / visible index | `fig2_thin_film` | `nb2.json`, `nb2_cache.npz` |
+| `nb2_thin_film_limits_and_PI.ipynb` | A: film-thickness sweep 5–100 µm with the measured reference pulse and measured noise (3 draws, 5 starts); B: polyimide on Si, multi-start fit, secondary minimum, Cramér–Rao bounds, comparison with profilometer / visible index; C (2026-11-27): PI re-measured 2026-11-25 as a reference–sample–reference bracket | `fig2_thin_film` (panel b from Part C) | `nb2.json` (Part C under `pi_2511`), `nb2_cache.npz` |
 | `nb3_quartz_si_adam_landscape.ipynb` | quartz/Si Adam fit (3 starts, 20 000 it.), sensitivity matrix, Cramér–Rao bounds and the κ₂-sign argument, softplus-constrained fit, two-phase PCA landscape | `fig3_exp_fit`, `fig4_adam_two_phase`, `fig_sensitivity` | `nb3.json`, `nb3_trajectories.npz`, `nb3_cache.npz` |
 | `nb4_lbfgs_vs_adam.ipynb` | L-BFGS (strong Wolfe, history 20) on the same parameters / loss / starts, every iterate recorded, projected on the planes of Fig. 4; MAE, rMSE and log-cosh losses for robustness | `fig5_lbfgs_trajectory` | `nb4.json` |
 | `nb5_quartz_air_si_six_knots.ipynb` | quartz / air / Si run 3, six-knot n(f), κ(f) per layer, two-stage Adam fit (15 000 + 30 000 it.), loss scans | `fig6_qas_fit`, `fig7_qas_nk`, `fig8_qas_scans` (optional panel) | `nb5.json`, `nb5_cache.npz` |
@@ -56,3 +56,22 @@ the numbers in `nb1.json`: with 1 thread, round-off changes the L-BFGS path and 
 
 Loop-1 run times (one thread per notebook, two notebooks in parallel on two cores): see `reviews/coder_report_loop1.md`.
 New helper module: `code/loop1_tools.py` (noise statistics, τ/a extractor, CR / GLS / sandwich covariances, block bootstrap, L-BFGS).
+
+## Part C of nb2 (2026-11-27): polyimide re-measured as a reference–sample–reference bracket
+
+Data `data/PI_silicon_ref1_15min_2511.txt` (14:28), `PI_silicon_15min_2511.txt` (14:48), `PI_silicon_ref2_15min_2511.txt` (15:06), 10 000
+waveforms each. Part C (appended after the loop-1 checks; Parts A/B and the loop-1 checks unchanged and reproduced bit-for-bit) writes
+`results/nb2.json → pi_2511`:
+
+| key | content |
+|---|---|
+| `data_checks` | pre-pulse σ / white level / peak of all five PI traces; time-zero drift ref2 − ref1 (phase slope 0.2–2 THz, main peak, cross-correlation); amplitude ratio; sample delays vs ref1, ref2, mean and for the old pair |
+| `fits` | `<variant>\|<reference>` for variants `all_free` (paper protocol, no τ), `nSi_fixed`, `all_free_tau_amp`, `nSi_fixed_tau_amp` × references `ref1`, `ref2`, `mean`: all 8 starts, best, CR bounds, at-bound flags, n·d spread, starts within 0.5 % |
+| `comparison_old_vs_new`, `criteria`, `better`, `verdict` | old (2026-11-12 pair, Part B / C1) vs new, the decision criteria and the verdict |
+| `fig2b_variant` | every number for Fig. 2(b) (now: paper protocol, no τ, against the mean reference); `fig2b_alternative_smallest_abs_tau` for the record |
+
+Figure handling: the loop-1 drawing code is now the function `draw_fig2(panel_b, path)`; the loop-1 version (2026-11-12 pair, free τ) is
+written to `figs_old/fig2_thin_film_loop1.*`, and Part C writes `figs/fig2_thin_film.*` (panel (a) and layout unchanged; smallest printed
+font 7.13 pt at 13.3 cm). If `pi_2511/better` were false, Part C would rewrite the loop-1 panel (b) instead.
+Run time of the whole notebook with `RUN_FULL = False`, `NB_THREADS=2`: ≈ 18 min (Part C fits 226 s; the rest is the loop-1 C11 checks,
+which are not cached). Report: `reviews/coder_report_pi2511.md`.
